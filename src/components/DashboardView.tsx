@@ -29,45 +29,45 @@ export function DashboardView() {
   const showPriorityPanel = priorityList.length > 0 || sortState !== 'idle';
 
   return (
-    <main>
-      <h1>Husky Planner</h1>
+    <main className="dashboard-view">
+      <section className="page-card dashboard-hero">
+        <div>
+          <p className="eyebrow">Dashboard</p>
+          <h2>Your classes</h2>
+          <p className="section-copy">
+            Add classes, track assignments, and sort the day by what needs attention first.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => void requestPrioritySort()}
+          disabled={sortState === 'loading' || !hasClasses}
+          aria-label="Sort assignments by priority"
+        >
+          {sortState === 'loading' ? 'Sorting…' : 'Sort by Priority'}
+        </button>
+      </section>
 
       {hasClasses ? (
         <>
-          {/* Sort by Priority button — only shown when at least one class exists */}
-          <button
-            type="button"
-            onClick={() => void requestPrioritySort()}
-            disabled={sortState === 'loading'}
-            aria-label="Sort assignments by priority"
-          >
-            Sort by Priority
-          </button>
-
           {/* Priority list panel — shown when list is non-empty or sort is in progress/error */}
           {showPriorityPanel && <PriorityListPanel />}
 
           {/* Class list ordered by createdAt ascending (insertion order) */}
-          <section aria-label="Class list">
+          <section className="page-card" aria-label="Class list">
             <h2>Your Classes</h2>
             <ul>
               {classes.map((cls) => (
-                <li key={cls.id}>
+                <li key={cls.id} className="class-row">
                   {/* Clicking the class name navigates to the class detail view */}
-                  <button
-                    type="button"
-                    onClick={() => selectClass(cls.id)}
-                    aria-label={`View class ${cls.name}`}
-                  >
-                    {cls.name}
+                  <button type="button" onClick={() => selectClass(cls.id)} aria-label={`View class ${cls.name}`} className="class-button">
+                    <span className="class-pill">Class</span>
+                    <strong>{cls.name}</strong>
                   </button>
 
                   {/* Delete button for the class */}
-                  <button
-                    type="button"
-                    onClick={() => deleteClass(cls.id)}
-                    aria-label={`Delete class ${cls.name}`}
-                  >
+                  <button type="button" onClick={() => deleteClass(cls.id)} aria-label={`Delete class ${cls.name}`} className="ghost-button danger-button">
                     Delete
                   </button>
                 </li>
@@ -77,11 +77,16 @@ export function DashboardView() {
         </>
       ) : (
         /* Empty-state message when no classes exist */
-        <p role="status">No classes yet. Add your first class below.</p>
+        <section className="page-card empty-state" role="status">
+          <h3>No classes yet</h3>
+          <p>Add your first class below to start building your schedule.</p>
+        </section>
       )}
 
       {/* Add class form is always visible */}
-      <AddClassForm />
+      <section className="page-card">
+        <AddClassForm />
+      </section>
     </main>
   );
 }

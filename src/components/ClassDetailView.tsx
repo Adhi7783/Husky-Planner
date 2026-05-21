@@ -23,22 +23,38 @@ export function ClassDetailView() {
     .sort((a, b) => parseISO(a.dueDate).getTime() - parseISO(b.dueDate).getTime());
 
   return (
-    <div>
-      <button type="button" onClick={() => selectClass(null)}>
-        Back
-      </button>
+    <div className="dashboard-view">
+      <section className="page-card detail-header">
+        <button type="button" onClick={() => selectClass(null)} className="ghost-button">
+          Back
+        </button>
 
-      <h1>{selectedClass.name}</h1>
+        <div>
+          <p className="eyebrow">Class detail</p>
+          <h2>{selectedClass.name}</h2>
+        </div>
+      </section>
 
       {classAssignments.length === 0 ? (
-        <p>No assignments yet. Add your first assignment below.</p>
+        <section className="page-card empty-state" role="status">
+          <h3>No assignments yet</h3>
+          <p>Add your first assignment below for this class.</p>
+        </section>
       ) : (
-        <ul aria-label="Assignments">
+        <section className="page-card">
+          <h3>Assignments</h3>
+          <ul aria-label="Assignments" className="assignment-list">
           {classAssignments.map((assignment) => (
-            <li key={assignment.id}>
-              <span>{assignment.name}</span>
-              <span>{assignment.dueDate}</span>
-              <label>
+            <li key={assignment.id} className="assignment-row">
+              <div className="assignment-main">
+                <strong>{assignment.name}</strong>
+                <span className="assignment-meta">Due {assignment.dueDate}</span>
+                {assignment.description !== undefined && (
+                  <span className="assignment-description">{assignment.description}</span>
+                )}
+              </div>
+
+              <label className="status-toggle">
                 <input
                   type="checkbox"
                   checked={assignment.completed}
@@ -53,24 +69,26 @@ export function ClassDetailView() {
                 />
                 {assignment.completed ? 'Completed' : 'Incomplete'}
               </label>
-              {assignment.description !== undefined && (
-                <span>{assignment.description}</span>
-              )}
+
               <button
                 type="button"
                 onClick={() =>
                   deleteAssignment(assignment.classId, assignment.id)
                 }
                 aria-label={`Delete assignment "${assignment.name}"`}
+                className="ghost-button danger-button"
               >
                 Delete
               </button>
             </li>
           ))}
-        </ul>
+          </ul>
+        </section>
       )}
 
-      <AddAssignmentForm classId={selectedClass.id} />
+      <section className="page-card">
+        <AddAssignmentForm classId={selectedClass.id} />
+      </section>
     </div>
   );
 }

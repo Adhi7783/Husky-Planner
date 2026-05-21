@@ -1,7 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { usePlannerStore } from './store/plannerStore';
 import { DashboardView } from './components/DashboardView';
 import { ClassDetailView } from './components/ClassDetailView';
+import { AuthGate, type PlannerUser } from './components/AuthGate';
+
+const AUTH_STORAGE_KEY = 'huskyPlanner_user_v1';
 
 /**
  * App
@@ -19,6 +22,19 @@ import { ClassDetailView } from './components/ClassDetailView';
  * Requirements: 4.2, 4.4, 5.1, 5.3, 5.4
  */
 function App() {
+  const [user, setUser] = useState<PlannerUser | null>(() => {
+    const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (raw === null) return null;
+
+    try {
+      return JSON.parse(raw) as PlannerUser;
+    } catch {
+      return null;
+    }
+  });
+
+  const classCount = usePlannerStore((state) => state.classes.length);
+  const assignmentCount = usePlannerStore((state) => state.assignments.length);
   const selectedClassId = usePlannerStore((state) => state.selectedClassId);
   const persistenceError = usePlannerStore((state) => state.persistenceError);
 
@@ -40,61 +56,83 @@ function App() {
     usePlannerStore.setState({ persistenceError: null });
   };
 
+  const handleAuth = (nextUser: PlannerUser) => {
+    setUser(nextUser);
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(nextUser));
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+  };
+
+  if (user === null) {
+    return <AuthGate onAuthenticated={handleAuth} />;
+  }
+
   return (
-    <>
-      {/* Corrupted-data recovery banner — persistent until dismissed */}
-      {isCorruptionError && (
-        <div
-          role="alert"
-          aria-live="assertive"
-          style={{
-            backgroundColor: '#fff3cd',
-            border: '1px solid #ffc107',
-            borderRadius: '4px',
-            padding: '12px 16px',
-            marginBottom: '8px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <span>{persistenceError}</span>
-          <button
-            type="button"
-            onClick={dismissBanner}
-            aria-label="Dismiss recovery notification"
-            style={{ marginLeft: '16px', cursor: 'pointer' }}
-          >
-            Dismiss
+    <div className="app-shell">
+      <header className="app-header">
+        <div>
+          <p className="eyebrow">UW student planner</p>
+          <h1>Husky Planner</h1>
+          <p className="header-copy">
+            A cleaner place to track classes, assignments, and AI priority sorting.
+          </p>
+          <div className="stats-row" aria-label="Planner summary">
+            <span>{classCount} classes</span>
+            <span>{assignmentCount} assignments</span>
+          </div>
+        </div>
+
+        <div className="user-chip" aria-label="Signed in account">
+          {user.picture ? <img src={user.picture} alt="" /> : <span>{user.name.slice(0, 1)}</span>}
+          <div>
+            <strong>{user.name}</strong>
+            <span>{user.email}</span>
+          </div>
+          <button type="button" onClick={handleLogout} className="ghost-button">
+            Log out
           </button>
         </div>
-      )}
+      </header>
 
-      {/* Main view — ClassDetailView when a class is selected, DashboardView otherwise */}
-      {selectedClassId !== null ? <ClassDetailView /> : <DashboardView />}
+      <main className="app-content">
+        {isCorruptionError && (
+          <div role="alert" aria-live="assertive" className="banner banner-warning">
+            <span>{persistenceError}</span>
+            <button type="button" onClick={dismissBanner} className="banner-button">
+              Dismiss
+            </button>
+          </div>
+        )}
 
-      {/* Non-blocking toast for transient persistence errors (auto-dismisses after 5 s) */}
+        <section className="hero-card">
+          <div>
+            <p className="eyebrow">Today&apos;s focus</p>
+            <h2>Keep assignments visible and work in priority order.</h2>
+          </div>
+          <div className="hero-stats">
+            <div>
+              <strong>{usePlannerStore.getState().classes.length}</strong>
+              <span>Classes tracked</span>
+            </div>
+            <div>
+              <strong>{usePlannerStore.getState().assignments.length}</strong>
+              <span>Total assignments</span>
+            </div>
+          </div>
+        </section>
+
+        {selectedClassId !== null ? <ClassDetailView /> : <DashboardView />}
+      </main>
+
       {persistenceError !== null && !isCorruptionError && (
-        <div
-          role="alert"
-          aria-live="polite"
-          style={{
-            position: 'fixed',
-            bottom: '24px',
-            right: '24px',
-            backgroundColor: '#f8d7da',
-            border: '1px solid #f5c2c7',
-            borderRadius: '4px',
-            padding: '12px 16px',
-            maxWidth: '360px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-            zIndex: 1000,
-          }}
-        >
+        <div role="alert" aria-live="polite" className="toast">
           {persistenceError}
         </div>
       )}
-    </>
+    </div>
   );
 }
 
