@@ -166,6 +166,18 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
     };
   }, [clientId, onAuthenticated]);
 
+  const fallbackUser: PlannerUser = {
+    name: 'Guest Planner',
+    email: 'guest@localhost',
+    subject: 'guest',
+  };
+
+  const canUseFallback = status === 'missing-client-id' || status === 'error';
+
+  function handleContinueWithoutGoogle() {
+    onAuthenticated(fallbackUser);
+  }
+
   return (
     <div className="auth-page">
       <section className="auth-hero">
@@ -199,10 +211,15 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
           {status === 'loading' && <div className="button-placeholder">Loading sign-in…</div>}
         </div>
 
-        {status === 'missing-client-id' && (
-          <div className="auth-note">
-            Add the Google client ID to your Vite environment and reload the page.
-          </div>
+        {canUseFallback && (
+          <>
+            <button type="button" className="secondary-button" onClick={handleContinueWithoutGoogle}>
+              Continue without Google
+            </button>
+            <div className="auth-note">
+              You can still use the planner locally without Google sign-in configured.
+            </div>
+          </>
         )}
       </section>
     </div>
