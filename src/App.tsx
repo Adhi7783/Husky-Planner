@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { usePlannerStore } from './store/plannerStore';
 import { DashboardView } from './components/DashboardView';
 import { ClassDetailView } from './components/ClassDetailView';
@@ -56,15 +56,15 @@ function App() {
     usePlannerStore.setState({ persistenceError: null });
   };
 
-  const handleAuth = (nextUser: PlannerUser) => {
+  const handleAuth = useCallback((nextUser: PlannerUser) => {
     setUser(nextUser);
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(nextUser));
-  };
+  }, []);
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     setUser(null);
     localStorage.removeItem(AUTH_STORAGE_KEY);
-  };
+  }, []);
 
   if (user === null) {
     return <AuthGate onAuthenticated={handleAuth} />;

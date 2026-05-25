@@ -259,12 +259,11 @@ export const usePlannerStore = create<PlannerState & PlannerActions>((set, get) 
     } catch (err) {
       console.error(`[STORE] Error during prioritization:`, err);
       
-      // Determine a descriptive error message using GeminiServiceError.kind if available
       let errorMessage: string;
       if (err instanceof GeminiServiceError) {
         switch (err.kind) {
           case 'http':
-            errorMessage = `API error: ${err.message}`;
+            errorMessage = err.message;
             break;
           case 'timeout':
             errorMessage = 'Request timed out. Please try again.';
@@ -281,9 +280,14 @@ export const usePlannerStore = create<PlannerState & PlannerActions>((set, get) 
         errorMessage = 'An unexpected error occurred. Please try again.';
       }
 
-      console.log(`[STORE] Setting sortState to 'error' with message: ${errorMessage}`);
-      set({ sortState: 'error', sortError: errorMessage });
-      // classes and assignments are left unchanged (no set call for them)
+      console.log(`[STORE] Prioritization failed: ${errorMessage}`);
+      set({
+        priorityList: [],
+        sortState: 'error',
+        sortError: errorMessage,
+      });
+
+      scheduleSave({ ...get() });
     }
   },
 }));

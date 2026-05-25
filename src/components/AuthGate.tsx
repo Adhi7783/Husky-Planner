@@ -49,6 +49,24 @@ interface AuthGateProps {
 
 const GOOGLE_SCRIPT_ID = 'google-identity-services';
 const GOOGLE_SCRIPT_SRC = 'https://accounts.google.com/gsi/client';
+const GOOGLE_GLOBAL_TIMEOUT_MS = 5000;
+
+function waitForGoogleIdentity(timeoutMs: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const start = window.setInterval(() => {
+      if (window.google?.accounts?.id) {
+        window.clearInterval(start);
+        window.clearTimeout(timeout);
+        resolve();
+      }
+    }, 50);
+
+    const timeout = window.setTimeout(() => {
+      window.clearInterval(start);
+      reject(new Error('Google Identity Services loaded, but the google.accounts.id API was not available.'));
+    }, timeoutMs);
+  });
+}
 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
   const payload = token.split('.')[1];
@@ -66,9 +84,9 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
 
 function loadGoogleScript(): Promise<void> {
   return new Promise((resolve, reject) => {
-    const existing = document.getElementById(GOOGLE_SCRIPT_ID);
+    const existing = document.getElementById(GOOGLE_SCRIPT_ID) as HTMLScriptElement | null;
     if (existing) {
-      resolve();
+      void waitForGoogleIdentity(GOOGLE_GLOBAL_TIMEOUT_MS).then(resolve).catch(reject);
       return;
     }
 
@@ -77,7 +95,9 @@ function loadGoogleScript(): Promise<void> {
     script.src = GOOGLE_SCRIPT_SRC;
     script.async = true;
     script.defer = true;
-    script.onload = () => resolve();
+    script.onload = () => {
+      void waitForGoogleIdentity(GOOGLE_GLOBAL_TIMEOUT_MS).then(resolve).catch(reject);
+    };
     script.onerror = () => reject(new Error('Google sign-in failed to load.'));
     document.head.appendChild(script);
   });
@@ -88,6 +108,7 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
   const [status, setStatus] = useState<'loading' | 'ready' | 'missing-client-id' | 'error'>(
     'loading'
   );
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
 
   const envClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
   const clientId = envClientId;
@@ -98,21 +119,34 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
     }
 
     if (status === 'error') {
-      return 'Google sign-in could not be initialized. Check that your OAuth client allows http://localhost:5173 as an authorized JavaScript origin.';
+      return (
+        errorDetails ??
+        `Google sign-in could not be initialized. Check that your OAuth client allows ${window.location.origin} as an authorized JavaScript origin.`
+      );
     }
 
     return 'Sign in with Google to keep your planner data separate on this device.';
-  }, [status]);
+  }, [status, errorDetails]);
 
   useEffect(() => {
     if (!clientId) {
       setStatus('missing-client-id');
+      setErrorDetails(null);
       return;
     }
 
     let cancelled = false;
+    const buttonElement = buttonRef.current;
+
+    if (!buttonElement) {
+      setErrorDetails('Google sign-in could not find the button container. Please refresh the page.');
+      setStatus('error');
+      return;
+    }
+
     const timeoutId = window.setTimeout(() => {
       if (!cancelled) {
+        setErrorDetails('Google sign-in timed out while initializing. Check browser privacy settings, extensions, and network access to accounts.google.com.');
         setStatus('error');
       }
     }, 8000);
@@ -121,7 +155,8 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
       .then(() => {
         if (cancelled) return;
 
-        if (!buttonRef.current || !window.google) {
+        if (!buttonElement || !window.google) {
+          setErrorDetails('Google sign-in script loaded, but the Google API object was not available. Check that the script was not blocked by the browser or an extension.');
           setStatus('error');
           return;
         }
@@ -145,8 +180,8 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
           cancel_on_tap_outside: false,
         });
 
-        buttonRef.current.innerHTML = '';
-        window.google.accounts.id.renderButton(buttonRef.current, {
+        buttonElement.replaceChildren();
+        window.google.accounts.id.renderButton(buttonElement, {
           theme: 'filled_blue',
           size: 'large',
           shape: 'pill',
@@ -155,14 +190,23 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
         });
 
         setStatus('ready');
+        setErrorDetails(null);
       })
-      .catch(() => {
-        if (!cancelled) setStatus('error');
+      .catch((err) => {
+        if (!cancelled) {
+          const message = err instanceof Error ? err.message : 'Google sign-in failed to load.';
+          setErrorDetails(message);
+          setStatus('error');
+        }
       });
 
     return () => {
       cancelled = true;
       window.clearTimeout(timeoutId);
+
+      if (buttonElement.isConnected) {
+        buttonElement.replaceChildren();
+      }
     };
   }, [clientId, onAuthenticated]);
 
@@ -207,9 +251,8 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
         <h2>Sign in with Google</h2>
         <p>{instruction}</p>
 
-        <div ref={buttonRef} className="google-button-slot">
-          {status === 'loading' && <div className="button-placeholder">Loading sign-in…</div>}
-        </div>
+        {status === 'loading' && <div className="button-placeholder">Loading sign-in…</div>}
+        <div ref={buttonRef} className="google-button-slot" aria-busy={status === 'loading'} />
 
         {canUseFallback && (
           <>

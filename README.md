@@ -31,12 +31,18 @@ VITE_GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
 
 Then restart the dev server.
 
-## Gemini API configuration
+## Groq API configuration
 
-To test the assignment sorter with Gemini, add your Gemini API key to the same `.env` file:
+To test the assignment sorter with Groq, add your Groq API key to the same `.env` file:
 
 ```env
-VITE_GEMINI_API_KEY=your-gemini-api-key
+VITE_GROQ_API_KEY=your-groq-api-key
+```
+
+Optional: set a model override if you want to try a different Groq model.
+
+```env
+VITE_GROQ_MODEL=llama-3.1-8b-instant
 ```
 
 Then restart the dev server.

@@ -26,9 +26,10 @@ export class GeminiServiceError extends Error {
 // ---------------------------------------------------------------------------
 
 // IMPORTANT:
-// Use v1beta instead of v1
-const GEMINI_ENDPOINT =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+// Groq uses an OpenAI-compatible chat completions endpoint.
+const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
+
+const DEFAULT_GROQ_MODEL = 'llama-3.1-8b-instant';
 
 const TIMEOUT_MS = 30_000;
 
@@ -70,12 +71,14 @@ ${list}
 Return ONLY valid JSON.
 
 Format:
-[
-  {
-    "assignmentId": "abc123",
-    "explanation": "Due soon and likely requires significant effort."
-  }
-]
+{
+  "priorityList": [
+    {
+      "assignmentId": "abc123",
+      "explanation": "Due soon and likely requires significant effort."
+    }
+  ]
+}
 `.trim();
 }
 
@@ -96,52 +99,41 @@ function isPriorityResult(value: unknown): value is PriorityResult {
   );
 }
 
-function parseGeminiResponse(body: unknown): PriorityResult[] {
+function parseGroqResponse(body: unknown): PriorityResult[] {
   if (typeof body !== 'object' || body === null) {
     throw new GeminiServiceError(
       'parse',
-      'Gemini response body is not an object'
+      'Groq response body is not an object'
     );
   }
 
   const obj = body as Record<string, unknown>;
 
-  const candidates = obj.candidates;
+  const candidates = obj.choices;
 
   if (!Array.isArray(candidates) || candidates.length === 0) {
     throw new GeminiServiceError(
       'parse',
-      'No candidates returned from Gemini'
+      'No choices returned from Groq'
     );
   }
 
   const firstCandidate = candidates[0] as Record<string, unknown>;
 
-  const content = firstCandidate.content as
+  const content = firstCandidate.message as
     | Record<string, unknown>
     | undefined;
 
-  const parts = content?.parts;
-
-  if (!Array.isArray(parts) || parts.length === 0) {
-    throw new GeminiServiceError(
-      'parse',
-      'No content parts returned from Gemini'
-    );
-  }
-
-  const firstPart = parts[0] as Record<string, unknown>;
-
-  const text = firstPart.text;
+  const text = content?.content;
 
   if (typeof text !== 'string') {
     throw new GeminiServiceError(
       'parse',
-      'Gemini response text missing'
+      'Groq response text missing'
     );
   }
 
-  // Remove markdown fences if Gemini adds them
+  // Remove markdown fences if the model wraps the JSON in a code block
   const cleaned = text
     .trim()
     .replace(/^```json\s*/i, '')
@@ -154,24 +146,43 @@ function parseGeminiResponse(body: unknown): PriorityResult[] {
   try {
     parsed = JSON.parse(cleaned);
   } catch {
-    console.error('[GEMINI] Failed JSON text:', cleaned);
+    console.error('[GROQ] Failed JSON text:', cleaned);
 
     throw new GeminiServiceError(
       'parse',
-      'Failed to parse Gemini JSON response'
+      'Failed to parse Groq JSON response'
     );
   }
 
-  if (!Array.isArray(parsed)) {
-    throw new GeminiServiceError(
-      'parse',
-      'Parsed Gemini response is not an array'
-    );
+  let priorityItems: unknown[];
+
+  if (Array.isArray(parsed)) {
+    priorityItems = parsed;
+  } else {
+    if (typeof parsed !== 'object' || parsed === null) {
+      throw new GeminiServiceError(
+        'parse',
+        'Parsed Groq response is not an array or object'
+      );
+    }
+
+    const obj = parsed as Record<string, unknown>;
+    const wrappedList =
+      obj.priorityList ?? obj.priorities ?? obj.results ?? obj.items ?? obj.assignments;
+
+    if (!Array.isArray(wrappedList)) {
+      throw new GeminiServiceError(
+        'parse',
+        'Parsed Groq response does not contain a priority list array'
+      );
+    }
+
+    priorityItems = wrappedList;
   }
 
   const results: PriorityResult[] = [];
 
-  for (const item of parsed) {
+  for (const item of priorityItems) {
     if (!isPriorityResult(item)) {
       throw new GeminiServiceError(
         'parse',
@@ -194,19 +205,23 @@ export const geminiService = {
     assignments: AssignmentPayload[]
   ): Promise<PriorityResult[]> {
     console.log(
-      `[GEMINI] prioritize() called with ${assignments.length} assignments`
+      `[GROQ] prioritize() called with ${assignments.length} assignments`
     );
 
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY as
+    const apiKey = import.meta.env.VITE_GROQ_API_KEY as
       | string
       | undefined;
 
     if (!apiKey?.trim()) {
       throw new GeminiServiceError(
         'http',
-        'Missing VITE_GEMINI_API_KEY in .env'
+        'Missing VITE_GROQ_API_KEY in .env'
       );
     }
+
+    const model =
+      (import.meta.env.VITE_GROQ_MODEL as string | undefined)?.trim() ||
+      DEFAULT_GROQ_MODEL;
 
     const controller = new AbortController();
 
@@ -215,45 +230,45 @@ export const geminiService = {
     }, TIMEOUT_MS);
 
     const requestBody = {
-      contents: [
+      model,
+      messages: [
         {
-          parts: [
-            {
-              text: buildPrompt(assignments),
-            },
-          ],
+          role: 'system',
+          content:
+            'You are an academic planner assistant. Return only JSON that matches the requested shape.',
+        },
+        {
+          role: 'user',
+          content: buildPrompt(assignments),
         },
       ],
-      generationConfig: {
-        temperature: 0.2,
-        responseMimeType: 'application/json',
+      response_format: {
+        type: 'json_object',
       },
+      temperature: 0.2,
+      max_completion_tokens: 512,
+      stream: false,
     };
 
     let response: Response;
 
     try {
-      console.log('[GEMINI] Sending request...');
+      console.log('[GROQ] Sending request...');
 
-      response = await fetch(
-        `${GEMINI_ENDPOINT}?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(requestBody),
-          signal: controller.signal,
-        }
-      );
+      response = await fetch(GROQ_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(requestBody),
+        signal: controller.signal,
+      });
     } catch (err) {
       clearTimeout(timeoutId);
 
       if (err instanceof Error && err.name === 'AbortError') {
-        throw new GeminiServiceError(
-          'timeout',
-          'Gemini request timed out'
-        );
+        throw new GeminiServiceError('timeout', 'Groq request timed out');
       }
 
       throw err;
@@ -261,8 +276,6 @@ export const geminiService = {
       clearTimeout(timeoutId);
     }
 
-    // IMPORTANT:
-    // Read full error body from Gemini
     if (!response.ok) {
       let errorText = '';
 
@@ -272,11 +285,11 @@ export const geminiService = {
         errorText = 'Unable to read error body';
       }
 
-      console.error('[GEMINI] API ERROR BODY:', errorText);
+      console.error('[GROQ] API ERROR BODY:', errorText);
 
       throw new GeminiServiceError(
         'http',
-        `Gemini API error ${response.status}: ${errorText}`,
+        `Groq API error ${response.status}: ${errorText}`,
         response.status
       );
     }
@@ -286,15 +299,12 @@ export const geminiService = {
     try {
       responseBody = await response.json();
     } catch {
-      throw new GeminiServiceError(
-        'parse',
-        'Failed to parse Gemini response JSON'
-      );
+      throw new GeminiServiceError('parse', 'Failed to parse Groq response JSON');
     }
 
-    console.log('[GEMINI] Success:', responseBody);
+    console.log('[GROQ] Success:', responseBody);
 
-    return parseGeminiResponse(responseBody);
+    return parseGroqResponse(responseBody);
   },
 };
 
