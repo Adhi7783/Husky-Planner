@@ -31,6 +31,16 @@ VITE_GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
 
 Then restart the dev server.
 
+## Gemini API configuration
+
+To test the assignment sorter with Gemini, add your Gemini API key to the same `.env` file:
+
+```env
+VITE_GEMINI_API_KEY=your-gemini-api-key
+```
+
+Then restart the dev server.
+
 ### If you do not have a Google client ID
 
 The app now supports a local fallback sign-in path.

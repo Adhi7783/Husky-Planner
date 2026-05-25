@@ -166,6 +166,13 @@ export const geminiService = {
   async prioritize(assignments: AssignmentPayload[]): Promise<PriorityResult[]> {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
 
+    if (!apiKey?.trim()) {
+      throw new GeminiServiceError(
+        'http',
+        'Gemini API key is not configured. Add VITE_GEMINI_API_KEY to a .env file in the project root and restart the dev server.'
+      );
+    }
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
