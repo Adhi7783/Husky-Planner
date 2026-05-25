@@ -6,22 +6,17 @@ import type { AssignmentPayload, PriorityResult } from '../types';
 
 export type GeminiErrorKind = 'http' | 'timeout' | 'parse';
 
-/**
- * Typed error thrown by GeminiService for all failure modes:
- * - 'http'    — non-2xx HTTP response from the Gemini API
- * - 'timeout' — request exceeded the 30-second AbortController timeout
- * - 'parse'   — response body could not be parsed into PriorityResult[]
- */
 export class GeminiServiceError extends Error {
   readonly kind: GeminiErrorKind;
   readonly statusCode?: number;
 
   constructor(kind: GeminiErrorKind, message: string, statusCode?: number) {
     super(message);
+
     this.name = 'GeminiServiceError';
     this.kind = kind;
     this.statusCode = statusCode;
-    // Restore prototype chain (required when extending built-in Error in TS)
+
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }
@@ -30,8 +25,10 @@ export class GeminiServiceError extends Error {
 // Constants
 // ---------------------------------------------------------------------------
 
+// IMPORTANT:
+// Use v1beta instead of v1
 const GEMINI_ENDPOINT =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
 const TIMEOUT_MS = 30_000;
 
@@ -42,7 +39,10 @@ const TIMEOUT_MS = 30_000;
 function buildPrompt(assignments: AssignmentPayload[]): string {
   const list = assignments
     .map((a, i) => {
-      const desc = a.description ? `\n   Description: ${a.description}` : '';
+      const desc = a.description
+        ? `\n   Description: ${a.description}`
+        : '';
+
       return (
         `${i + 1}. ID: ${a.id}\n` +
         `   Name: ${a.name}\n` +
@@ -53,23 +53,30 @@ function buildPrompt(assignments: AssignmentPayload[]): string {
     })
     .join('\n\n');
 
-  return (
-    'You are an academic planner assistant. Analyze the following assignments and ' +
-    'return a prioritized list ordered from highest to lowest priority.\n\n' +
-    'For each assignment, provide a concise explanation that references at least one ' +
-    'concrete prioritization factor such as due date proximity, estimated effort, or ' +
-    'dependencies between assignments.\n\n' +
-    'Assignments:\n' +
-    list +
-    '\n\n' +
-    'Respond with ONLY a valid JSON array (no markdown, no code fences) in this exact format:\n' +
-    '[\n' +
-    '  { "assignmentId": "<id>", "explanation": "<explanation referencing a concrete factor>" },\n' +
-    '  ...\n' +
-    ']\n\n' +
-    'The array must contain exactly one entry per assignment, ordered by priority ' +
-    '(highest priority first). Do not include any text outside the JSON array.'
-  );
+  return `
+You are an academic planner assistant.
+
+Analyze the assignments below and rank them from highest priority to lowest priority.
+
+Prioritize based on:
+- due date proximity
+- workload
+- urgency
+- dependencies
+
+Assignments:
+${list}
+
+Return ONLY valid JSON.
+
+Format:
+[
+  {
+    "assignmentId": "abc123",
+    "explanation": "Due soon and likely requires significant effort."
+  }
+]
+`.trim();
 }
 
 // ---------------------------------------------------------------------------
@@ -77,73 +84,101 @@ function buildPrompt(assignments: AssignmentPayload[]): string {
 // ---------------------------------------------------------------------------
 
 function isPriorityResult(value: unknown): value is PriorityResult {
-  if (typeof value !== 'object' || value === null) return false;
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
   const obj = value as Record<string, unknown>;
+
   return (
     typeof obj.assignmentId === 'string' &&
-    typeof obj.explanation === 'string' &&
-    obj.explanation.trim().length > 0
+    typeof obj.explanation === 'string'
   );
 }
 
 function parseGeminiResponse(body: unknown): PriorityResult[] {
-  // Gemini REST response shape:
-  // { candidates: [{ content: { parts: [{ text: "..." }] } }] }
   if (typeof body !== 'object' || body === null) {
-    throw new GeminiServiceError('parse', 'Response body is not an object');
+    throw new GeminiServiceError(
+      'parse',
+      'Gemini response body is not an object'
+    );
   }
 
   const obj = body as Record<string, unknown>;
+
   const candidates = obj.candidates;
 
   if (!Array.isArray(candidates) || candidates.length === 0) {
-    throw new GeminiServiceError('parse', 'No candidates in Gemini response');
+    throw new GeminiServiceError(
+      'parse',
+      'No candidates returned from Gemini'
+    );
   }
 
   const firstCandidate = candidates[0] as Record<string, unknown>;
-  const content = firstCandidate?.content as Record<string, unknown> | undefined;
+
+  const content = firstCandidate.content as
+    | Record<string, unknown>
+    | undefined;
+
   const parts = content?.parts;
 
   if (!Array.isArray(parts) || parts.length === 0) {
-    throw new GeminiServiceError('parse', 'No parts in Gemini response candidate');
+    throw new GeminiServiceError(
+      'parse',
+      'No content parts returned from Gemini'
+    );
   }
 
   const firstPart = parts[0] as Record<string, unknown>;
-  const text = firstPart?.text;
+
+  const text = firstPart.text;
 
   if (typeof text !== 'string') {
-    throw new GeminiServiceError('parse', 'Response part text is not a string');
+    throw new GeminiServiceError(
+      'parse',
+      'Gemini response text missing'
+    );
   }
 
-  // Strip optional markdown code fences that the model may include despite instructions
+  // Remove markdown fences if Gemini adds them
   const cleaned = text
     .trim()
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/\s*```$/, '')
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/\s*```$/i, '')
     .trim();
 
   let parsed: unknown;
+
   try {
     parsed = JSON.parse(cleaned);
   } catch {
+    console.error('[GEMINI] Failed JSON text:', cleaned);
+
     throw new GeminiServiceError(
       'parse',
-      `Could not parse Gemini response as JSON: ${cleaned.slice(0, 200)}`
+      'Failed to parse Gemini JSON response'
     );
   }
 
   if (!Array.isArray(parsed)) {
-    throw new GeminiServiceError('parse', 'Parsed Gemini response is not an array');
+    throw new GeminiServiceError(
+      'parse',
+      'Parsed Gemini response is not an array'
+    );
   }
 
   const results: PriorityResult[] = [];
+
   for (const item of parsed) {
     if (!isPriorityResult(item)) {
       throw new GeminiServiceError(
         'parse',
-        `Invalid PriorityResult entry: ${JSON.stringify(item)}`
+        `Invalid PriorityResult: ${JSON.stringify(item)}`
       );
     }
+
     results.push(item);
   }
 
@@ -155,71 +190,109 @@ function parseGeminiResponse(body: unknown): PriorityResult[] {
 // ---------------------------------------------------------------------------
 
 export const geminiService = {
-  /**
-   * Sends all provided assignments to the Gemini API and returns them ordered
-   * by priority, each with an explanation referencing a concrete factor.
-   *
-   * @throws {GeminiServiceError} with kind 'http'    on non-2xx HTTP status
-   * @throws {GeminiServiceError} with kind 'timeout' when the request exceeds 30 s
-   * @throws {GeminiServiceError} with kind 'parse'   on unparseable response
-   */
-  async prioritize(assignments: AssignmentPayload[]): Promise<PriorityResult[]> {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
+  async prioritize(
+    assignments: AssignmentPayload[]
+  ): Promise<PriorityResult[]> {
+    console.log(
+      `[GEMINI] prioritize() called with ${assignments.length} assignments`
+    );
+
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY as
+      | string
+      | undefined;
 
     if (!apiKey?.trim()) {
       throw new GeminiServiceError(
         'http',
-        'Gemini API key is not configured. Add VITE_GEMINI_API_KEY to a .env file in the project root and restart the dev server.'
+        'Missing VITE_GEMINI_API_KEY in .env'
       );
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, TIMEOUT_MS);
 
     const requestBody = {
       contents: [
         {
-          parts: [{ text: buildPrompt(assignments) }],
+          parts: [
+            {
+              text: buildPrompt(assignments),
+            },
+          ],
         },
       ],
+      generationConfig: {
+        temperature: 0.2,
+        responseMimeType: 'application/json',
+      },
     };
 
     let response: Response;
+
     try {
-      response = await fetch(`${GEMINI_ENDPOINT}?key=${apiKey ?? ''}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-        signal: controller.signal,
-      });
+      console.log('[GEMINI] Sending request...');
+
+      response = await fetch(
+        `${GEMINI_ENDPOINT}?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody),
+          signal: controller.signal,
+        }
+      );
     } catch (err) {
       clearTimeout(timeoutId);
-      // AbortController fires a DOMException with name 'AbortError'
+
       if (err instanceof Error && err.name === 'AbortError') {
         throw new GeminiServiceError(
           'timeout',
-          'Gemini API request timed out after 30 seconds'
+          'Gemini request timed out'
         );
       }
+
       throw err;
     } finally {
       clearTimeout(timeoutId);
     }
 
+    // IMPORTANT:
+    // Read full error body from Gemini
     if (!response.ok) {
+      let errorText = '';
+
+      try {
+        errorText = await response.text();
+      } catch {
+        errorText = 'Unable to read error body';
+      }
+
+      console.error('[GEMINI] API ERROR BODY:', errorText);
+
       throw new GeminiServiceError(
         'http',
-        `Gemini API returned HTTP ${response.status}: ${response.statusText}`,
+        `Gemini API error ${response.status}: ${errorText}`,
         response.status
       );
     }
 
     let responseBody: unknown;
+
     try {
       responseBody = await response.json();
     } catch {
-      throw new GeminiServiceError('parse', 'Failed to parse Gemini API response as JSON');
+      throw new GeminiServiceError(
+        'parse',
+        'Failed to parse Gemini response JSON'
+      );
     }
+
+    console.log('[GEMINI] Success:', responseBody);
 
     return parseGeminiResponse(responseBody);
   },

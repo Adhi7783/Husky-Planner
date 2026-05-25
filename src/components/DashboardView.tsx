@@ -28,6 +28,14 @@ export function DashboardView() {
   const hasClasses = classes.length > 0;
   const showPriorityPanel = priorityList.length > 0 || sortState !== 'idle';
 
+  // Log render to detect StrictMode double invocation
+  console.log(`[DASHBOARD] Rendering with sortState=${sortState}, priorityList.length=${priorityList.length}`);
+
+  const handleSortClick = async () => {
+    console.log(`[DASHBOARD] Sort button clicked`);
+    await requestPrioritySort();
+  };
+
   return (
     <main className="dashboard-view">
       <section className="page-card dashboard-hero">
@@ -41,7 +49,7 @@ export function DashboardView() {
 
         <button
           type="button"
-          onClick={() => void requestPrioritySort()}
+          onClick={handleSortClick}
           disabled={sortState === 'loading' || !hasClasses}
           aria-label="Sort assignments by priority"
         >

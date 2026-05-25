@@ -169,16 +169,30 @@ export const usePlannerStore = create<PlannerState & PlannerActions>((set, get) 
   },
 
   async requestPrioritySort(): Promise<void> {
-    const { assignments, classes } = get();
+    console.log(`[STORE] requestPrioritySort() called`);
+    
+    const { assignments, classes, sortState: currentSortState } = get();
+    
+    console.log(`[STORE] Current sortState: ${currentSortState}`);
+
+    // Guard: prevent duplicate requests while one is already in flight
+    if (currentSortState === 'loading') {
+      console.warn(`[STORE] Request already in flight (sortState=loading), ignoring duplicate call`);
+      return;
+    }
 
     // Guard: if no incomplete assignments exist, set informational message and return
     const incompleteAssignments = assignments.filter((a) => !a.completed);
+    console.log(`[STORE] Found ${incompleteAssignments.length} incomplete assignments`);
+    
     if (incompleteAssignments.length === 0) {
+      console.log(`[STORE] No incomplete assignments, setting error state`);
       set({ sortError: 'No incomplete assignments to prioritize.' });
       return;
     }
 
     // Set loading state to disable sort button in UI
+    console.log(`[STORE] Setting sortState to 'loading', making API request...`);
     set({ sortState: 'loading', sortError: null });
 
     // Collect all incomplete assignments as AssignmentPayload[]
@@ -197,17 +211,54 @@ export const usePlannerStore = create<PlannerState & PlannerActions>((set, get) 
     });
 
     try {
+      console.log(`[STORE] Calling geminiService.prioritize() with ${payload.length} assignments`);
       const results = await geminiService.prioritize(payload);
+      console.log(`[STORE] Gemini returned ${results.length} prioritized results`);
 
-      // Map PriorityResult[] to PriorityItem[] by adding rank (index + 1)
+      const currentAssignments = get().assignments;
+      const assignmentsById = new Map(currentAssignments.map((assignment) => [assignment.id, assignment]));
+      const reorderedAssignments = [] as typeof currentAssignments;
+
+      for (const result of results) {
+        const assignment = assignmentsById.get(result.assignmentId);
+        if (!assignment) {
+          console.warn(
+            `[STORE] Gemini result contains unknown assignmentId ${result.assignmentId}, skipping.`
+          );
+          continue;
+        }
+        reorderedAssignments.push({
+          ...assignment,
+          explanation: result.explanation,
+        });
+        assignmentsById.delete(result.assignmentId);
+      }
+
+      // Preserve assignments not included in the priority response, keeping their original relative order.
+      const remainingAssignments = currentAssignments.filter((assignment) =>
+        assignmentsById.has(assignment.id)
+      );
+
+      const updatedAssignments = [...reorderedAssignments, ...remainingAssignments];
+
       const priorityList = results.map((result, index) => ({
         assignmentId: result.assignmentId,
         rank: index + 1,
         explanation: result.explanation,
       }));
 
-      set({ priorityList, sortState: 'idle', sortError: null });
+      console.log(`[STORE] Setting reordered assignments, priorityList, and sortState to 'idle'`);
+      set({
+        assignments: updatedAssignments,
+        priorityList,
+        sortState: 'idle',
+        sortError: null,
+      });
+
+      scheduleSave({ ...get() });
     } catch (err) {
+      console.error(`[STORE] Error during prioritization:`, err);
+      
       // Determine a descriptive error message using GeminiServiceError.kind if available
       let errorMessage: string;
       if (err instanceof GeminiServiceError) {
@@ -230,6 +281,7 @@ export const usePlannerStore = create<PlannerState & PlannerActions>((set, get) 
         errorMessage = 'An unexpected error occurred. Please try again.';
       }
 
+      console.log(`[STORE] Setting sortState to 'error' with message: ${errorMessage}`);
       set({ sortState: 'error', sortError: errorMessage });
       // classes and assignments are left unchanged (no set call for them)
     }

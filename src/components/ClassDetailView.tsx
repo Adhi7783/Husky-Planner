@@ -16,11 +16,8 @@ export function ClassDetailView() {
     return null;
   }
 
-  // Filter assignments for this class and sort by dueDate ascending
-  const classAssignments = assignments
-    .filter((a) => a.classId === selectedClass.id)
-    .slice()
-    .sort((a, b) => parseISO(a.dueDate).getTime() - parseISO(b.dueDate).getTime());
+  // Filter assignments for this class in the canonical store order.
+  const classAssignments = assignments.filter((a) => a.classId === selectedClass.id);
 
   return (
     <div className="dashboard-view">

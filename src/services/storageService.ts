@@ -33,7 +33,8 @@ function isAssignment(value: unknown): value is Assignment {
     typeof obj.dueDate === 'string' &&
     typeof obj.completed === 'boolean' &&
     typeof obj.createdAt === 'number' &&
-    (obj.description === undefined || typeof obj.description === 'string')
+    (obj.description === undefined || typeof obj.description === 'string') &&
+    (obj.explanation === undefined || typeof obj.explanation === 'string')
   );
 }
 

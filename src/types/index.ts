@@ -10,6 +10,7 @@ export interface Assignment {
   name: string;         // trimmed, non-empty
   dueDate: string;      // ISO 8601 date string (YYYY-MM-DD)
   description?: string; // optional, stored as-is
+  explanation?: string; // optional AI reasoning attached after prioritization
   completed: boolean;
   createdAt: number;    // Date.now() at creation
 }
