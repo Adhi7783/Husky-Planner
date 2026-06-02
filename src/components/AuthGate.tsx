@@ -238,7 +238,7 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
           </article>
           <article>
             <strong>AI prioritization</strong>
-            <span>Gemini helps rank what to work on first.</span>
+            <span>Groq helps rank what to work on first.</span>
           </article>
           <article>
             <strong>Persistent data</strong>

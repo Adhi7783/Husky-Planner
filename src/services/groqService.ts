@@ -4,16 +4,16 @@ import type { AssignmentPayload, PriorityResult } from '../types';
 // Typed error class
 // ---------------------------------------------------------------------------
 
-export type GeminiErrorKind = 'http' | 'timeout' | 'parse';
+export type GroqErrorKind = 'http' | 'timeout' | 'parse';
 
-export class GeminiServiceError extends Error {
-  readonly kind: GeminiErrorKind;
+export class GroqServiceError extends Error {
+  readonly kind: GroqErrorKind;
   readonly statusCode?: number;
 
-  constructor(kind: GeminiErrorKind, message: string, statusCode?: number) {
+  constructor(kind: GroqErrorKind, message: string, statusCode?: number) {
     super(message);
 
-    this.name = 'GeminiServiceError';
+    this.name = 'GroqServiceError';
     this.kind = kind;
     this.statusCode = statusCode;
 
@@ -101,7 +101,7 @@ function isPriorityResult(value: unknown): value is PriorityResult {
 
 function parseGroqResponse(body: unknown): PriorityResult[] {
   if (typeof body !== 'object' || body === null) {
-    throw new GeminiServiceError(
+    throw new GroqServiceError(
       'parse',
       'Groq response body is not an object'
     );
@@ -112,7 +112,7 @@ function parseGroqResponse(body: unknown): PriorityResult[] {
   const candidates = obj.choices;
 
   if (!Array.isArray(candidates) || candidates.length === 0) {
-    throw new GeminiServiceError(
+    throw new GroqServiceError(
       'parse',
       'No choices returned from Groq'
     );
@@ -127,7 +127,7 @@ function parseGroqResponse(body: unknown): PriorityResult[] {
   const text = content?.content;
 
   if (typeof text !== 'string') {
-    throw new GeminiServiceError(
+    throw new GroqServiceError(
       'parse',
       'Groq response text missing'
     );
@@ -148,7 +148,7 @@ function parseGroqResponse(body: unknown): PriorityResult[] {
   } catch {
     console.error('[GROQ] Failed JSON text:', cleaned);
 
-    throw new GeminiServiceError(
+    throw new GroqServiceError(
       'parse',
       'Failed to parse Groq JSON response'
     );
@@ -160,7 +160,7 @@ function parseGroqResponse(body: unknown): PriorityResult[] {
     priorityItems = parsed;
   } else {
     if (typeof parsed !== 'object' || parsed === null) {
-      throw new GeminiServiceError(
+      throw new GroqServiceError(
         'parse',
         'Parsed Groq response is not an array or object'
       );
@@ -171,7 +171,7 @@ function parseGroqResponse(body: unknown): PriorityResult[] {
       obj.priorityList ?? obj.priorities ?? obj.results ?? obj.items ?? obj.assignments;
 
     if (!Array.isArray(wrappedList)) {
-      throw new GeminiServiceError(
+      throw new GroqServiceError(
         'parse',
         'Parsed Groq response does not contain a priority list array'
       );
@@ -184,7 +184,7 @@ function parseGroqResponse(body: unknown): PriorityResult[] {
 
   for (const item of priorityItems) {
     if (!isPriorityResult(item)) {
-      throw new GeminiServiceError(
+      throw new GroqServiceError(
         'parse',
         `Invalid PriorityResult: ${JSON.stringify(item)}`
       );
@@ -197,10 +197,10 @@ function parseGroqResponse(body: unknown): PriorityResult[] {
 }
 
 // ---------------------------------------------------------------------------
-// GeminiService
+// GroqService
 // ---------------------------------------------------------------------------
 
-export const geminiService = {
+export const groqService = {
   async prioritize(
     assignments: AssignmentPayload[]
   ): Promise<PriorityResult[]> {
@@ -213,7 +213,7 @@ export const geminiService = {
       | undefined;
 
     if (!apiKey?.trim()) {
-      throw new GeminiServiceError(
+      throw new GroqServiceError(
         'http',
         'Missing VITE_GROQ_API_KEY in .env'
       );
@@ -268,7 +268,7 @@ export const geminiService = {
       clearTimeout(timeoutId);
 
       if (err instanceof Error && err.name === 'AbortError') {
-        throw new GeminiServiceError('timeout', 'Groq request timed out');
+        throw new GroqServiceError('timeout', 'Groq request timed out');
       }
 
       throw err;
@@ -287,7 +287,7 @@ export const geminiService = {
 
       console.error('[GROQ] API ERROR BODY:', errorText);
 
-      throw new GeminiServiceError(
+      throw new GroqServiceError(
         'http',
         `Groq API error ${response.status}: ${errorText}`,
         response.status
@@ -299,7 +299,7 @@ export const geminiService = {
     try {
       responseBody = await response.json();
     } catch {
-      throw new GeminiServiceError('parse', 'Failed to parse Groq response JSON');
+      throw new GroqServiceError('parse', 'Failed to parse Groq response JSON');
     }
 
     console.log('[GROQ] Success:', responseBody);
@@ -308,4 +308,4 @@ export const geminiService = {
   },
 };
 
-export default geminiService;
+export default groqService;

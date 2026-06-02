@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { parseISO, isValid } from 'date-fns';
 import type { PlannerState, NewAssignment, AssignmentPayload } from '../types';
 import { storageService } from '../services/storageService';
-import { geminiService, GeminiServiceError } from '../services/geminiService';
+import { groqService, GroqServiceError } from '../services/groqService';
 
 // ---------------------------------------------------------------------------
 // PlannerActions interface
@@ -211,9 +211,9 @@ export const usePlannerStore = create<PlannerState & PlannerActions>((set, get) 
     });
 
     try {
-      console.log(`[STORE] Calling geminiService.prioritize() with ${payload.length} assignments`);
-      const results = await geminiService.prioritize(payload);
-      console.log(`[STORE] Gemini returned ${results.length} prioritized results`);
+      console.log(`[STORE] Calling groqService.prioritize() with ${payload.length} assignments`);
+      const results = await groqService.prioritize(payload);
+      console.log(`[STORE] Groq returned ${results.length} prioritized results`);
 
       const currentAssignments = get().assignments;
       const assignmentsById = new Map(currentAssignments.map((assignment) => [assignment.id, assignment]));
@@ -223,7 +223,7 @@ export const usePlannerStore = create<PlannerState & PlannerActions>((set, get) 
         const assignment = assignmentsById.get(result.assignmentId);
         if (!assignment) {
           console.warn(
-            `[STORE] Gemini result contains unknown assignmentId ${result.assignmentId}, skipping.`
+            `[STORE] Groq result contains unknown assignmentId ${result.assignmentId}, skipping.`
           );
           continue;
         }
@@ -260,7 +260,7 @@ export const usePlannerStore = create<PlannerState & PlannerActions>((set, get) 
       console.error(`[STORE] Error during prioritization:`, err);
       
       let errorMessage: string;
-      if (err instanceof GeminiServiceError) {
+      if (err instanceof GroqServiceError) {
         switch (err.kind) {
           case 'http':
             errorMessage = err.message;
