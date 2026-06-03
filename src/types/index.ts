@@ -29,6 +29,7 @@ export interface PlannerState {
   sortState: 'idle' | 'loading' | 'error';
   sortError: string | null;
   persistenceError: string | null;
+  activeUserId: string;
 }
 
 export interface AssignmentPayload {

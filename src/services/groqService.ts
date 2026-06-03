@@ -146,7 +146,9 @@ function parseGroqResponse(body: unknown): PriorityResult[] {
   try {
     parsed = JSON.parse(cleaned);
   } catch {
-    console.error('[GROQ] Failed JSON text:', cleaned);
+    if (import.meta.env.DEV) {
+      console.error('[GROQ] Failed JSON text:', cleaned);
+    }
 
     throw new GroqServiceError(
       'parse',
@@ -204,10 +206,6 @@ export const groqService = {
   async prioritize(
     assignments: AssignmentPayload[]
   ): Promise<PriorityResult[]> {
-    console.log(
-      `[GROQ] prioritize() called with ${assignments.length} assignments`
-    );
-
     const apiKey = import.meta.env.VITE_GROQ_API_KEY as
       | string
       | undefined;
@@ -253,8 +251,6 @@ export const groqService = {
     let response: Response;
 
     try {
-      console.log('[GROQ] Sending request...');
-
       response = await fetch(GROQ_ENDPOINT, {
         method: 'POST',
         headers: {
@@ -285,7 +281,9 @@ export const groqService = {
         errorText = 'Unable to read error body';
       }
 
-      console.error('[GROQ] API ERROR BODY:', errorText);
+      if (import.meta.env.DEV) {
+        console.error('[GROQ] API ERROR BODY:', errorText);
+      }
 
       throw new GroqServiceError(
         'http',
@@ -302,7 +300,9 @@ export const groqService = {
       throw new GroqServiceError('parse', 'Failed to parse Groq response JSON');
     }
 
-    console.log('[GROQ] Success:', responseBody);
+    if (import.meta.env.DEV) {
+      console.log('[GROQ] Success:', responseBody);
+    }
 
     return parseGroqResponse(responseBody);
   },

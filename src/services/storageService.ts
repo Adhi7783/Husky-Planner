@@ -1,6 +1,8 @@
 import type { Class, Assignment, PlannerState } from '../types';
 
-const STORAGE_KEY = 'huskyPlanner_v1';
+function getKey(userId: string): string {
+  return `huskyPlanner_v1:${userId}`;
+}
 
 /** Shape of the data persisted to localStorage (ephemeral fields excluded). */
 interface PersistedState {
@@ -52,7 +54,7 @@ export const storageService = {
    * Serializes classes, assignments, and selectedClassId to localStorage.
    * Returns an Error if the write fails (e.g. quota exceeded), otherwise void.
    */
-  save(state: PlannerState): Error | void {
+  save(state: PlannerState, userId: string): Error | void {
     const payload: PersistedState = {
       classes: state.classes,
       assignments: state.assignments,
@@ -60,7 +62,7 @@ export const storageService = {
     };
 
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      localStorage.setItem(getKey(userId), JSON.stringify(payload));
     } catch (err) {
       return err instanceof Error ? err : new Error(String(err));
     }
@@ -74,8 +76,8 @@ export const storageService = {
    *   invalid entries are silently discarded, valid ones are kept.
    * - Returns a partial PlannerState with ephemeral fields set to defaults.
    */
-  load(): PlannerState | null {
-    const raw = localStorage.getItem(STORAGE_KEY);
+  load(userId: string): PlannerState | null {
+    const raw = localStorage.getItem(getKey(userId));
     if (raw === null) return null;
 
     let parsed: unknown;
@@ -106,6 +108,7 @@ export const storageService = {
       sortState: 'idle',
       sortError: null,
       persistenceError: null,
+      activeUserId: '',
     };
   },
 };

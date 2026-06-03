@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { usePlannerStore } from './store/plannerStore';
+import { usePlannerStore, hydratePlannerStore } from './store/plannerStore';
 import { DashboardView } from './components/DashboardView';
 import { ClassDetailView } from './components/ClassDetailView';
 import { AuthGate, type PlannerUser } from './components/AuthGate';
@@ -27,7 +27,9 @@ function App() {
     if (raw === null) return null;
 
     try {
-      return JSON.parse(raw) as PlannerUser;
+      const u = JSON.parse(raw) as PlannerUser;
+      hydratePlannerStore(u.subject);
+      return u;
     } catch {
       return null;
     }
@@ -59,6 +61,7 @@ function App() {
   const handleAuth = useCallback((nextUser: PlannerUser) => {
     setUser(nextUser);
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(nextUser));
+    hydratePlannerStore(nextUser.subject);
   }, []);
 
   const handleLogout = useCallback(() => {

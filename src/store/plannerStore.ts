@@ -31,6 +31,7 @@ const initialState: PlannerState = {
   sortState: 'idle',
   sortError: null,
   persistenceError: null,
+  activeUserId: '',
 };
 
 // ---------------------------------------------------------------------------
@@ -40,12 +41,16 @@ const initialState: PlannerState = {
 let saveTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
 function scheduleSave(state: PlannerState): void {
+  if (!state.activeUserId) {
+    return;
+  }
+
   if (saveTimeoutId !== null) {
     clearTimeout(saveTimeoutId);
   }
   saveTimeoutId = setTimeout(() => {
     saveTimeoutId = null;
-    const result = storageService.save(state);
+    const result = storageService.save(state, state.activeUserId);
     if (result instanceof Error) {
       usePlannerStore.setState({
         persistenceError: 'Changes could not be saved. Storage may be full.',
@@ -169,30 +174,26 @@ export const usePlannerStore = create<PlannerState & PlannerActions>((set, get) 
   },
 
   async requestPrioritySort(): Promise<void> {
-    console.log(`[STORE] requestPrioritySort() called`);
-    
     const { assignments, classes, sortState: currentSortState } = get();
-    
-    console.log(`[STORE] Current sortState: ${currentSortState}`);
 
     // Guard: prevent duplicate requests while one is already in flight
     if (currentSortState === 'loading') {
-      console.warn(`[STORE] Request already in flight (sortState=loading), ignoring duplicate call`);
+      if (import.meta.env.DEV) {
+        console.warn(
+          `[STORE] Request already in flight (sortState=loading), ignoring duplicate call`
+        );
+      }
       return;
     }
 
     // Guard: if no incomplete assignments exist, set informational message and return
     const incompleteAssignments = assignments.filter((a) => !a.completed);
-    console.log(`[STORE] Found ${incompleteAssignments.length} incomplete assignments`);
     
     if (incompleteAssignments.length === 0) {
-      console.log(`[STORE] No incomplete assignments, setting error state`);
       set({ sortError: 'No incomplete assignments to prioritize.' });
       return;
     }
 
-    // Set loading state to disable sort button in UI
-    console.log(`[STORE] Setting sortState to 'loading', making API request...`);
     set({ sortState: 'loading', sortError: null });
 
     // Collect all incomplete assignments as AssignmentPayload[]
@@ -211,9 +212,7 @@ export const usePlannerStore = create<PlannerState & PlannerActions>((set, get) 
     });
 
     try {
-      console.log(`[STORE] Calling groqService.prioritize() with ${payload.length} assignments`);
       const results = await groqService.prioritize(payload);
-      console.log(`[STORE] Groq returned ${results.length} prioritized results`);
 
       const currentAssignments = get().assignments;
       const assignmentsById = new Map(currentAssignments.map((assignment) => [assignment.id, assignment]));
@@ -222,9 +221,11 @@ export const usePlannerStore = create<PlannerState & PlannerActions>((set, get) 
       for (const result of results) {
         const assignment = assignmentsById.get(result.assignmentId);
         if (!assignment) {
-          console.warn(
-            `[STORE] Groq result contains unknown assignmentId ${result.assignmentId}, skipping.`
-          );
+          if (import.meta.env.DEV) {
+            console.warn(
+              `[STORE] Groq result contains unknown assignmentId ${result.assignmentId}, skipping.`
+            );
+          }
           continue;
         }
         reorderedAssignments.push({
@@ -247,7 +248,6 @@ export const usePlannerStore = create<PlannerState & PlannerActions>((set, get) 
         explanation: result.explanation,
       }));
 
-      console.log(`[STORE] Setting reordered assignments, priorityList, and sortState to 'idle'`);
       set({
         assignments: updatedAssignments,
         priorityList,
@@ -257,7 +257,9 @@ export const usePlannerStore = create<PlannerState & PlannerActions>((set, get) 
 
       scheduleSave({ ...get() });
     } catch (err) {
-      console.error(`[STORE] Error during prioritization:`, err);
+      if (import.meta.env.DEV) {
+        console.error(`[STORE] Error during prioritization:`, err);
+      }
       
       let errorMessage: string;
       if (err instanceof GroqServiceError) {
@@ -280,7 +282,9 @@ export const usePlannerStore = create<PlannerState & PlannerActions>((set, get) 
         errorMessage = 'An unexpected error occurred. Please try again.';
       }
 
-      console.log(`[STORE] Prioritization failed: ${errorMessage}`);
+      if (import.meta.env.DEV) {
+        console.log(`[STORE] Prioritization failed: ${errorMessage}`);
+      }
       set({
         priorityList: [],
         sortState: 'error',
@@ -296,26 +300,27 @@ export const usePlannerStore = create<PlannerState & PlannerActions>((set, get) 
 // Store hydration from localStorage
 // ---------------------------------------------------------------------------
 
-{
-  const STORAGE_KEY = 'huskyPlanner_v1';
-  const rawExists = localStorage.getItem(STORAGE_KEY) !== null;
-  const loaded = storageService.load();
+export function hydratePlannerStore(userId: string): void {
+  const rawKey = `huskyPlanner_v1:${userId}`;
+  const rawExists = localStorage.getItem(rawKey) !== null;
+  const loaded = storageService.load(userId);
 
   if (loaded !== null) {
-    // Merge persisted fields into the store's initial state
     usePlannerStore.setState({
       classes: loaded.classes,
       assignments: loaded.assignments,
       selectedClassId: loaded.selectedClassId,
+      activeUserId: userId,
     });
   } else if (rawExists) {
-    // Key existed but load() returned null — data was corrupted
     usePlannerStore.setState({
+      activeUserId: userId,
       persistenceError:
         'Some previously saved data could not be loaded and has been discarded.',
     });
+  } else {
+    usePlannerStore.setState({ activeUserId: userId });
   }
-  // If rawExists is false, this is a fresh start — do nothing
 }
 
 export default usePlannerStore;

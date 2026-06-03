@@ -238,7 +238,7 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
           </article>
           <article>
             <strong>AI prioritization</strong>
-            <span>Groq helps rank what to work on first.</span>
+            <span>AI-powered ranking puts your most urgent work first.</span>
           </article>
           <article>
             <strong>Persistent data</strong>

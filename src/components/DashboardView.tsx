@@ -28,12 +28,8 @@ export function DashboardView() {
   const hasClasses = classes.length > 0;
   const showPriorityPanel = priorityList.length > 0 || sortState !== 'idle';
 
-  // Log render to detect StrictMode double invocation
-  console.log(`[DASHBOARD] Rendering with sortState=${sortState}, priorityList.length=${priorityList.length}`);
-
-  const handleSortClick = async () => {
-    console.log(`[DASHBOARD] Sort button clicked`);
-    await requestPrioritySort();
+  const handleSortClick = () => {
+    void requestPrioritySort();
   };
 
   return (

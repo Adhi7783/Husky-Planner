@@ -110,3 +110,10 @@ Then restart the dev server.
 - Planner data is stored locally in the browser.
 - Google sign-in is optional and the app includes a local fallback path.
 - The deployed version is hosted on Vercel for easy access by users and reviewers.
+
+## Security notes
+
+- **Google ID token**: The token returned by Google Sign-In is decoded client-side
+  to extract name, email, and subject. The signature, `aud`, and `exp` fields are
+  not verified — this is acceptable for a local-storage-only app with no backend,
+  but should not be used as the basis for any server-side trust decisions.
