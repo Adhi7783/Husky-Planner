@@ -6,6 +6,7 @@ const mockClass = (name: string): Class => ({
   id: '1',
   name,
   createdAt: 0,
+  difficulty: 1,
 });
 
 describe('validateClassName', () => {

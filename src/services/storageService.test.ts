@@ -30,7 +30,7 @@ describe('storageService', () => {
 
   it('round-trips a save/load', () => {
     const state = {
-      classes: [{ id: 'c1', name: 'Math', createdAt: 0 }],
+      classes: [{ id: 'c1', name: 'Math', createdAt: 0, difficulty: 1 }],
       assignments: [],
       selectedClassId: null,
       priorityList: [],
@@ -47,7 +47,7 @@ describe('storageService', () => {
 
   it('isolates data between users', () => {
     const state = {
-      classes: [{ id: 'c1', name: 'Math', createdAt: 0 }],
+      classes: [{ id: 'c1', name: 'Math', createdAt: 0, difficulty: 1 }],
       assignments: [],
       selectedClassId: null,
       priorityList: [],
