@@ -25,60 +25,127 @@ export class GroqServiceError extends Error {
 // Constants
 // ---------------------------------------------------------------------------
 
-// IMPORTANT:
-// Groq uses an OpenAI-compatible chat completions endpoint.
 const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
-
 const DEFAULT_GROQ_MODEL = 'llama-3.1-8b-instant';
-
 const TIMEOUT_MS = 30_000;
 
 // ---------------------------------------------------------------------------
-// Prompt builder
+// Helpers
+// ---------------------------------------------------------------------------
+
+function difficultyLabel(d: number): string {
+  const labels: Record<number, string> = {
+    1: 'Very Easy',
+    2: 'Easy',
+    3: 'Moderate',
+    4: 'Hard',
+    5: 'Very Hard',
+  };
+  return labels[d] ?? 'Unknown';
+}
+
+function daysUntil(dueDateStr: string): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const due = new Date(dueDateStr);
+  due.setHours(0, 0, 0, 0);
+  return Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+// ---------------------------------------------------------------------------
+// Prompt builder — enriched with difficulty, weight, and urgency signals
 // ---------------------------------------------------------------------------
 
 function buildPrompt(assignments: AssignmentPayload[]): string {
+  const today = new Date().toISOString().split('T')[0];
+
   const list = assignments
     .map((a, i) => {
-      const desc = a.description
-        ? `\n   Description: ${a.description}`
+      const days = daysUntil(a.dueDate);
+      const urgencyTag =
+        days < 0
+          ? '⚠️ OVERDUE'
+          : days === 0
+          ? '🔴 DUE TODAY'
+          : days <= 2
+          ? '🟠 DUE VERY SOON'
+          : days <= 7
+          ? '🟡 DUE THIS WEEK'
+          : '🟢 DUE LATER';
+
+      const weightStr =
+        a.weight !== undefined
+          ? `Grade Weight: ${a.weight}% of final grade`
+          : 'Grade Weight: not specified';
+
+      const diffStr =
+        a.difficulty !== undefined
+          ? `Assignment Difficulty: ${a.difficulty}/5 (${difficultyLabel(a.difficulty)})`
+          : 'Assignment Difficulty: not specified';
+
+      const classDiffStr =
+        a.classDifficulty !== undefined
+          ? `Course Difficulty: ${a.classDifficulty}/5 (${difficultyLabel(a.classDifficulty)})`
+          : 'Course Difficulty: not specified';
+
+      const descStr = a.description
+        ? `Notes: ${a.description}`
         : '';
 
-      return (
-        `${i + 1}. ID: ${a.id}\n` +
-        `   Name: ${a.name}\n` +
-        `   Due Date: ${a.dueDate}\n` +
-        `   Class: ${a.className}` +
-        desc
-      );
+      return [
+        `${i + 1}. [ID: ${a.id}] ${urgencyTag}`,
+        `   Assignment: ${a.name}`,
+        `   Course: ${a.className}`,
+        `   Due: ${a.dueDate} (${days >= 0 ? `${days} day${days !== 1 ? 's' : ''} from now` : `${Math.abs(days)} day${Math.abs(days) !== 1 ? 's' : ''} overdue`})`,
+        `   ${weightStr}`,
+        `   ${diffStr}`,
+        `   ${classDiffStr}`,
+        descStr ? `   ${descStr}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n');
     })
     .join('\n\n');
 
   return `
-You are an academic planner assistant.
+You are an academic priority assistant helping a UW Bothell CSS student manage their workload.
 
-Analyze the assignments below and rank them from highest priority to lowest priority.
+Today's date: ${today}
 
-Prioritize based on:
-- due date proximity
-- workload
-- urgency
-- dependencies
+## Your Task
+Rank the following assignments from HIGHEST to LOWEST priority so the student knows what to work on first.
 
-Assignments:
-${list}
+## Scoring Rubric (reason step by step before ranking)
+Use a weighted scoring model:
 
-Return ONLY valid JSON.
+1. **Urgency** (40%): Overdue > due today > ≤2 days > ≤7 days > later.
+   Overdue = very high urgency regardless of other factors.
 
-Format:
+2. **Grade Impact** (30%): Higher grade weight = higher priority.
+   If weight is unspecified, assume it is moderately important (~20%).
+
+3. **Effort Required** (30%): Combine assignment difficulty × course difficulty.
+   A hard assignment in a hard course requires the most lead time.
+   Start harder tasks earlier even if due date is slightly further away.
+
+## Output Rules
+- Return ONLY valid JSON, no markdown fences, no explanation outside JSON.
+- Every assignment in the input must appear exactly once in the output.
+- Explanations must be 1–2 sentences, specific to THIS student's situation
+  (mention due date, grade weight, and difficulty where relevant).
+
+JSON shape:
 {
   "priorityList": [
     {
-      "assignmentId": "abc123",
-      "explanation": "Due soon and likely requires significant effort."
+      "assignmentId": "<exact id from input>",
+      "explanation": "<1–2 sentence specific reason>"
     }
   ]
 }
+
+## Assignments to rank:
+${list}
 `.trim();
 }
 
@@ -87,12 +154,8 @@ Format:
 // ---------------------------------------------------------------------------
 
 function isPriorityResult(value: unknown): value is PriorityResult {
-  if (typeof value !== 'object' || value === null) {
-    return false;
-  }
-
+  if (typeof value !== 'object' || value === null) return false;
   const obj = value as Record<string, unknown>;
-
   return (
     typeof obj.assignmentId === 'string' &&
     typeof obj.explanation === 'string'
@@ -101,39 +164,24 @@ function isPriorityResult(value: unknown): value is PriorityResult {
 
 function parseGroqResponse(body: unknown): PriorityResult[] {
   if (typeof body !== 'object' || body === null) {
-    throw new GroqServiceError(
-      'parse',
-      'Groq response body is not an object'
-    );
+    throw new GroqServiceError('parse', 'Groq response body is not an object');
   }
 
   const obj = body as Record<string, unknown>;
-
   const candidates = obj.choices;
 
   if (!Array.isArray(candidates) || candidates.length === 0) {
-    throw new GroqServiceError(
-      'parse',
-      'No choices returned from Groq'
-    );
+    throw new GroqServiceError('parse', 'No choices returned from Groq');
   }
 
   const firstCandidate = candidates[0] as Record<string, unknown>;
-
-  const content = firstCandidate.message as
-    | Record<string, unknown>
-    | undefined;
-
+  const content = firstCandidate.message as Record<string, unknown> | undefined;
   const text = content?.content;
 
   if (typeof text !== 'string') {
-    throw new GroqServiceError(
-      'parse',
-      'Groq response text missing'
-    );
+    throw new GroqServiceError('parse', 'Groq response text missing');
   }
 
-  // Remove markdown fences if the model wraps the JSON in a code block
   const cleaned = text
     .trim()
     .replace(/^```json\s*/i, '')
@@ -149,11 +197,7 @@ function parseGroqResponse(body: unknown): PriorityResult[] {
     if (import.meta.env.DEV) {
       console.error('[GROQ] Failed JSON text:', cleaned);
     }
-
-    throw new GroqServiceError(
-      'parse',
-      'Failed to parse Groq JSON response'
-    );
+    throw new GroqServiceError('parse', 'Failed to parse Groq JSON response');
   }
 
   let priorityItems: unknown[];
@@ -162,10 +206,7 @@ function parseGroqResponse(body: unknown): PriorityResult[] {
     priorityItems = parsed;
   } else {
     if (typeof parsed !== 'object' || parsed === null) {
-      throw new GroqServiceError(
-        'parse',
-        'Parsed Groq response is not an array or object'
-      );
+      throw new GroqServiceError('parse', 'Parsed Groq response is not an array or object');
     }
 
     const obj = parsed as Record<string, unknown>;
@@ -173,10 +214,7 @@ function parseGroqResponse(body: unknown): PriorityResult[] {
       obj.priorityList ?? obj.priorities ?? obj.results ?? obj.items ?? obj.assignments;
 
     if (!Array.isArray(wrappedList)) {
-      throw new GroqServiceError(
-        'parse',
-        'Parsed Groq response does not contain a priority list array'
-      );
+      throw new GroqServiceError('parse', 'Parsed Groq response does not contain a priority list array');
     }
 
     priorityItems = wrappedList;
@@ -186,12 +224,8 @@ function parseGroqResponse(body: unknown): PriorityResult[] {
 
   for (const item of priorityItems) {
     if (!isPriorityResult(item)) {
-      throw new GroqServiceError(
-        'parse',
-        `Invalid PriorityResult: ${JSON.stringify(item)}`
-      );
+      throw new GroqServiceError('parse', `Invalid PriorityResult: ${JSON.stringify(item)}`);
     }
-
     results.push(item);
   }
 
@@ -203,18 +237,11 @@ function parseGroqResponse(body: unknown): PriorityResult[] {
 // ---------------------------------------------------------------------------
 
 export const groqService = {
-  async prioritize(
-    assignments: AssignmentPayload[]
-  ): Promise<PriorityResult[]> {
-    const apiKey = import.meta.env.VITE_GROQ_API_KEY as
-      | string
-      | undefined;
+  async prioritize(assignments: AssignmentPayload[]): Promise<PriorityResult[]> {
+    const apiKey = import.meta.env.VITE_GROQ_API_KEY as string | undefined;
 
     if (!apiKey?.trim()) {
-      throw new GroqServiceError(
-        'http',
-        'Missing VITE_GROQ_API_KEY in .env'
-      );
+      throw new GroqServiceError('http', 'Missing VITE_GROQ_API_KEY in .env');
     }
 
     const model =
@@ -222,10 +249,7 @@ export const groqService = {
       DEFAULT_GROQ_MODEL;
 
     const controller = new AbortController();
-
-    const timeoutId = setTimeout(() => {
-      controller.abort();
-    }, TIMEOUT_MS);
+    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
     const requestBody = {
       model,
@@ -233,18 +257,18 @@ export const groqService = {
         {
           role: 'system',
           content:
-            'You are an academic planner assistant. Return only JSON that matches the requested shape.',
+            'You are an academic priority assistant for UW Bothell CSS students. ' +
+            'You analyze assignment urgency, grade weight, and difficulty to rank work. ' +
+            'Return only JSON that matches the requested shape, no markdown fences.',
         },
         {
           role: 'user',
           content: buildPrompt(assignments),
         },
       ],
-      response_format: {
-        type: 'json_object',
-      },
-      temperature: 0.2,
-      max_completion_tokens: 512,
+      response_format: { type: 'json_object' },
+      temperature: 0.15,
+      max_completion_tokens: 1024,
       stream: false,
     };
 
@@ -262,11 +286,9 @@ export const groqService = {
       });
     } catch (err) {
       clearTimeout(timeoutId);
-
       if (err instanceof Error && err.name === 'AbortError') {
         throw new GroqServiceError('timeout', 'Groq request timed out');
       }
-
       throw err;
     } finally {
       clearTimeout(timeoutId);
@@ -274,7 +296,6 @@ export const groqService = {
 
     if (!response.ok) {
       let errorText = '';
-
       try {
         errorText = await response.text();
       } catch {

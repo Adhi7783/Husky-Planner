@@ -32,6 +32,7 @@ export function validateClassName(name: string, existingClasses: Class[]): strin
  *
  * @param name - The assignment name.
  * @param dueDate - The due date string (expected ISO 8601 format, e.g. YYYY-MM-DD).
+ * @param weight - Optional grade weight string (0–100).
  * @returns A map of field name → error message for each invalid field.
  *          Returns an empty object `{}` if all fields are valid.
  *
@@ -39,7 +40,8 @@ export function validateClassName(name: string, existingClasses: Class[]): strin
  */
 export function validateAssignmentFields(
   name: string,
-  dueDate: string
+  dueDate: string,
+  weight?: string,
 ): Record<string, string> {
   const errors: Record<string, string> = {};
 
@@ -49,6 +51,13 @@ export function validateAssignmentFields(
 
   if (!dueDate || !isValid(parseISO(dueDate))) {
     errors['dueDate'] = 'A valid due date is required (YYYY-MM-DD).';
+  }
+
+  if (weight !== undefined && weight !== '') {
+    const parsed = Number(weight);
+    if (isNaN(parsed) || parsed < 0 || parsed > 100) {
+      errors['weight'] = 'Grade weight must be between 0 and 100.';
+    }
   }
 
   return errors;

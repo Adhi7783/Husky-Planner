@@ -2,18 +2,26 @@ import { usePlannerStore } from '../store/plannerStore';
 import { AddClassForm } from './AddClassForm';
 import { PriorityListPanel } from './PriorityListPanel';
 
+const DIFFICULTY_COLORS: Record<number, string> = {
+  1: '#4ade80',
+  2: '#a3e635',
+  3: '#facc15',
+  4: '#fb923c',
+  5: '#f87171',
+};
+
+const DIFFICULTY_LABELS: Record<number, string> = {
+  1: 'Very Easy',
+  2: 'Easy',
+  3: 'Moderate',
+  4: 'Hard',
+  5: 'Very Hard',
+};
+
 /**
  * DashboardView
  *
  * Main dashboard that displays the student's class list and AI priority sort controls.
- *
- * Rendering rules:
- * - When no classes exist: shows an empty-state message and the AddClassForm; no sort button.
- * - When classes exist: renders the class list ordered by `createdAt` ascending (insertion order),
- *   a "Sort by Priority" button (disabled while `sortState === 'loading'`), and the AddClassForm.
- * - Each class item is clickable and calls `selectClass(cls.id)`.
- * - Each class item has a delete button that calls `deleteClass(cls.id)`.
- * - `PriorityListPanel` is rendered when `priorityList.length > 0` OR `sortState !== 'idle'`.
  *
  * Requirements: 1.5, 1.6, 3.5, 5.1, 5.2
  */
@@ -24,6 +32,7 @@ export function DashboardView() {
   const selectClass = usePlannerStore((state) => state.selectClass);
   const deleteClass = usePlannerStore((state) => state.deleteClass);
   const requestPrioritySort = usePlannerStore((state) => state.requestPrioritySort);
+  const assignments = usePlannerStore((state) => state.assignments);
 
   const hasClasses = classes.length > 0;
   const showPriorityPanel = priorityList.length > 0 || sortState !== 'idle';
@@ -39,7 +48,7 @@ export function DashboardView() {
           <p className="eyebrow">Dashboard</p>
           <h2>Your classes</h2>
           <p className="section-copy">
-            Add classes, track assignments, and sort the day by what needs attention first.
+            Add classes, track assignments by grade weight and difficulty, and let AI sort what needs attention first.
           </p>
         </div>
 
@@ -47,47 +56,79 @@ export function DashboardView() {
           type="button"
           onClick={handleSortClick}
           disabled={sortState === 'loading' || !hasClasses}
-          aria-label="Sort assignments by priority"
+          aria-label="Sort assignments by priority using AI"
         >
-          {sortState === 'loading' ? 'Sorting…' : 'Sort by Priority'}
+          {sortState === 'loading' ? 'Analyzing…' : '✦ AI Priority Sort'}
         </button>
       </section>
 
       {hasClasses ? (
         <>
-          {/* Priority list panel — shown when list is non-empty or sort is in progress/error */}
           {showPriorityPanel && <PriorityListPanel />}
 
-          {/* Class list ordered by createdAt ascending (insertion order) */}
           <section className="page-card" aria-label="Class list">
             <h2>Your Classes</h2>
             <ul>
-              {classes.map((cls) => (
-                <li key={cls.id} className="class-row">
-                  {/* Clicking the class name navigates to the class detail view */}
-                  <button type="button" onClick={() => selectClass(cls.id)} aria-label={`View class ${cls.name}`} className="class-button">
-                    <span className="class-pill">Class</span>
-                    <strong>{cls.name}</strong>
-                  </button>
+              {classes.map((cls) => {
+                const classAssignmentCount = assignments.filter((a) => a.classId === cls.id).length;
+                const incompleteCount = assignments.filter((a) => a.classId === cls.id && !a.completed).length;
+                const difficulty = cls.difficulty ?? 3;
+                const diffColor = DIFFICULTY_COLORS[difficulty] ?? '#facc15';
+                const diffLabel = DIFFICULTY_LABELS[difficulty] ?? 'Moderate';
 
-                  {/* Delete button for the class */}
-                  <button type="button" onClick={() => deleteClass(cls.id)} aria-label={`Delete class ${cls.name}`} className="ghost-button danger-button">
-                    Delete
-                  </button>
-                </li>
-              ))}
+                return (
+                  <li key={cls.id} className="class-row">
+                    <button
+                      type="button"
+                      onClick={() => selectClass(cls.id)}
+                      aria-label={`View class ${cls.name}`}
+                      className="class-button"
+                    >
+                      <span className="class-pill">Class</span>
+                      <strong>{cls.name}</strong>
+
+                      {/* Difficulty badge */}
+                      <span
+                        className="difficulty-tag"
+                        style={{ '--diff-color': diffColor } as React.CSSProperties}
+                        title={`Course difficulty: ${difficulty}/5 — ${diffLabel}`}
+                        aria-label={`Difficulty ${difficulty} out of 5: ${diffLabel}`}
+                      >
+                        {'●'.repeat(difficulty)}{'○'.repeat(5 - difficulty)}
+                        <span className="diff-label">{diffLabel}</span>
+                      </span>
+
+                      {/* Assignment count */}
+                      {classAssignmentCount > 0 && (
+                        <span className="class-assignment-count" aria-label={`${incompleteCount} incomplete assignments`}>
+                          {incompleteCount > 0
+                            ? `${incompleteCount} pending`
+                            : `${classAssignmentCount} done`}
+                        </span>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => deleteClass(cls.id)}
+                      aria-label={`Delete class ${cls.name}`}
+                      className="ghost-button danger-button"
+                    >
+                      Delete
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           </section>
         </>
       ) : (
-        /* Empty-state message when no classes exist */
         <section className="page-card empty-state" role="status">
           <h3>No classes yet</h3>
-          <p>Add your first class below to start building your schedule.</p>
+          <p>Add your first class below — start typing a CSS course name for autocomplete.</p>
         </section>
       )}
 
-      {/* Add class form is always visible */}
       <section className="page-card">
         <AddClassForm />
       </section>

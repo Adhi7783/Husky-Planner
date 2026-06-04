@@ -225,24 +225,25 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
   return (
     <div className="auth-page">
       <section className="auth-hero">
-        <p className="eyebrow">Husky Planner</p>
-        <h1>Plan faster. Worry less. Stay on top of your coursework.</h1>
+        <p className="eyebrow">Husky Planner · UW Bothell</p>
+        <h1>Plan smarter. Worry less. Stay on top of your CSS coursework.</h1>
         <p>
-          Track classes, sort assignments by priority, and keep the whole workload in one place.
+          Track UWB classes, weight assignments by grade impact, and let AI rank
+          what needs attention first — built for CSS students at UW Bothell.
         </p>
 
         <div className="feature-grid">
           <article>
-            <strong>Clean overview</strong>
-            <span>Assignments stay grouped by class and due date.</span>
+            <strong>UWB CSS courses</strong>
+            <span>Auto-fills difficulty for 35+ CSS, MATH &amp; STMATH courses at UW Bothell.</span>
           </article>
           <article>
             <strong>AI prioritization</strong>
-            <span>AI-powered ranking puts your most urgent work first.</span>
+            <span>Groq AI ranks work by due date urgency, grade weight, and course difficulty.</span>
           </article>
           <article>
             <strong>Persistent data</strong>
-            <span>Your planner survives refreshes on this device.</span>
+            <span>Your planner survives refreshes and is isolated per Google account.</span>
           </article>
         </div>
       </section>

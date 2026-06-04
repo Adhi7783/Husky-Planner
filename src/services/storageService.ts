@@ -22,6 +22,7 @@ function isClass(value: unknown): value is Class {
     typeof obj.id === 'string' &&
     typeof obj.name === 'string' &&
     typeof obj.createdAt === 'number'
+    // difficulty is optional — old saved data without it is still valid
   );
 }
 
@@ -36,7 +37,9 @@ function isAssignment(value: unknown): value is Assignment {
     typeof obj.completed === 'boolean' &&
     typeof obj.createdAt === 'number' &&
     (obj.description === undefined || typeof obj.description === 'string') &&
-    (obj.explanation === undefined || typeof obj.explanation === 'string')
+    (obj.explanation === undefined || typeof obj.explanation === 'string') &&
+    (obj.weight === undefined || typeof obj.weight === 'number') &&
+    (obj.difficulty === undefined || typeof obj.difficulty === 'number')
   );
 }
 
@@ -96,7 +99,12 @@ export const storageService = {
     const selectedClassId =
       typeof obj.selectedClassId === 'string' ? obj.selectedClassId : null;
 
-    const classes: Class[] = rawClasses.filter(isClass);
+    const classes: Class[] = rawClasses.filter(isClass).map((cls) => ({
+      ...cls,
+      // Backfill difficulty for classes saved before this field existed
+      difficulty: typeof cls.difficulty === 'number' ? cls.difficulty : 3,
+    }));
+
     const assignments: Assignment[] = rawAssignments.filter(isAssignment);
 
     return {

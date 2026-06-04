@@ -10,7 +10,7 @@ import { groqService, GroqServiceError } from '../services/groqService';
 // ---------------------------------------------------------------------------
 
 interface PlannerActions {
-  addClass(name: string): void;
+  addClass(name: string, difficulty?: number): void;
   deleteClass(classId: string): void;
   addAssignment(classId: string, assignment: NewAssignment): void;
   deleteAssignment(classId: string, assignmentId: string): void;
@@ -41,9 +41,7 @@ const initialState: PlannerState = {
 let saveTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
 function scheduleSave(state: PlannerState): void {
-  if (!state.activeUserId) {
-    return;
-  }
+  if (!state.activeUserId) return;
 
   if (saveTimeoutId !== null) {
     clearTimeout(saveTimeoutId);
@@ -67,32 +65,25 @@ export const usePlannerStore = create<PlannerState & PlannerActions>((set, get) 
   ...initialState,
 
   // -------------------------------------------------------------------------
-  // addClass
+  // addClass — now accepts optional difficulty (1–5, default 3)
   // -------------------------------------------------------------------------
-  addClass(name: string): void {
+  addClass(name: string, difficulty = 3): void {
     const trimmed = name.trim();
-
-    // Reject empty / whitespace-only names
     if (trimmed.length === 0) return;
 
     const { classes } = get();
-
-    // Reject case-insensitive duplicates
     const lowerTrimmed = trimmed.toLowerCase();
-    const isDuplicate = classes.some(
-      (cls) => cls.name.toLowerCase() === lowerTrimmed
-    );
+    const isDuplicate = classes.some((cls) => cls.name.toLowerCase() === lowerTrimmed);
     if (isDuplicate) return;
 
     const newClass = {
       id: uuidv4(),
       name: trimmed,
       createdAt: Date.now(),
+      difficulty: Math.min(5, Math.max(1, Math.round(difficulty))),
     };
 
     set((state) => ({ classes: [...state.classes, newClass] }));
-
-    // Schedule debounced save with the updated state
     scheduleSave({ ...get() });
   },
 
@@ -100,15 +91,11 @@ export const usePlannerStore = create<PlannerState & PlannerActions>((set, get) 
   // deleteClass
   // -------------------------------------------------------------------------
   deleteClass(classId: string): void {
-    // Atomically remove the class and all its assignments in one setState call
     set((state) => ({
       classes: state.classes.filter((cls) => cls.id !== classId),
       assignments: state.assignments.filter((a) => a.classId !== classId),
-      // Clear selectedClassId if the deleted class was selected
-      selectedClassId:
-        state.selectedClassId === classId ? null : state.selectedClassId,
+      selectedClassId: state.selectedClassId === classId ? null : state.selectedClassId,
     }));
-
     scheduleSave({ ...get() });
   },
 
@@ -120,15 +107,11 @@ export const usePlannerStore = create<PlannerState & PlannerActions>((set, get) 
   },
 
   // -------------------------------------------------------------------------
-  // addAssignment
+  // addAssignment — now accepts weight and difficulty
   // -------------------------------------------------------------------------
   addAssignment(classId: string, assignment: NewAssignment): void {
     const trimmedName = assignment.name.trim();
-
-    // Validate non-empty name
     if (trimmedName.length === 0) return;
-
-    // Validate ISO 8601 due date
     if (!assignment.dueDate || !isValid(parseISO(assignment.dueDate))) return;
 
     const newAssignment = {
@@ -137,12 +120,13 @@ export const usePlannerStore = create<PlannerState & PlannerActions>((set, get) 
       name: trimmedName,
       dueDate: assignment.dueDate,
       description: assignment.description,
+      weight: assignment.weight,
+      difficulty: assignment.difficulty,
       completed: false,
       createdAt: Date.now(),
     };
 
     set((state) => ({ assignments: [...state.assignments, newAssignment] }));
-
     scheduleSave({ ...get() });
   },
 
@@ -152,11 +136,8 @@ export const usePlannerStore = create<PlannerState & PlannerActions>((set, get) 
   deleteAssignment(_classId: string, assignmentId: string): void {
     set((state) => ({
       assignments: state.assignments.filter((a) => a.id !== assignmentId),
-      priorityList: state.priorityList.filter(
-        (item) => item.assignmentId !== assignmentId
-      ),
+      priorityList: state.priorityList.filter((item) => item.assignmentId !== assignmentId),
     }));
-
     scheduleSave({ ...get() });
   },
 
@@ -169,26 +150,24 @@ export const usePlannerStore = create<PlannerState & PlannerActions>((set, get) 
         a.id === assignmentId ? { ...a, completed: !a.completed } : a
       ),
     }));
-
     scheduleSave({ ...get() });
   },
 
+  // -------------------------------------------------------------------------
+  // requestPrioritySort — enriched payload with difficulty/weight/classDifficulty
+  // -------------------------------------------------------------------------
   async requestPrioritySort(): Promise<void> {
     const { assignments, classes, sortState: currentSortState } = get();
 
-    // Guard: prevent duplicate requests while one is already in flight
     if (currentSortState === 'loading') {
       if (import.meta.env.DEV) {
-        console.warn(
-          `[STORE] Request already in flight (sortState=loading), ignoring duplicate call`
-        );
+        console.warn('[STORE] Request already in flight, ignoring duplicate call');
       }
       return;
     }
 
-    // Guard: if no incomplete assignments exist, set informational message and return
     const incompleteAssignments = assignments.filter((a) => !a.completed);
-    
+
     if (incompleteAssignments.length === 0) {
       set({ sortError: 'No incomplete assignments to prioritize.' });
       return;
@@ -196,7 +175,7 @@ export const usePlannerStore = create<PlannerState & PlannerActions>((set, get) 
 
     set({ sortState: 'loading', sortError: null });
 
-    // Collect all incomplete assignments as AssignmentPayload[]
+    // Build enriched payload — include difficulty, weight, and class difficulty
     const payload: AssignmentPayload[] = incompleteAssignments.map((a) => {
       const parentClass = classes.find((cls) => cls.id === a.classId);
       const entry: AssignmentPayload = {
@@ -205,9 +184,10 @@ export const usePlannerStore = create<PlannerState & PlannerActions>((set, get) 
         dueDate: a.dueDate,
         className: parentClass?.name ?? '',
       };
-      if (a.description !== undefined) {
-        entry.description = a.description;
-      }
+      if (a.description !== undefined) entry.description = a.description;
+      if (a.weight !== undefined) entry.weight = a.weight;
+      if (a.difficulty !== undefined) entry.difficulty = a.difficulty;
+      if (parentClass?.difficulty !== undefined) entry.classDifficulty = parentClass.difficulty;
       return entry;
     });
 
@@ -215,31 +195,22 @@ export const usePlannerStore = create<PlannerState & PlannerActions>((set, get) 
       const results = await groqService.prioritize(payload);
 
       const currentAssignments = get().assignments;
-      const assignmentsById = new Map(currentAssignments.map((assignment) => [assignment.id, assignment]));
+      const assignmentsById = new Map(currentAssignments.map((a) => [a.id, a]));
       const reorderedAssignments = [] as typeof currentAssignments;
 
       for (const result of results) {
         const assignment = assignmentsById.get(result.assignmentId);
         if (!assignment) {
           if (import.meta.env.DEV) {
-            console.warn(
-              `[STORE] Groq result contains unknown assignmentId ${result.assignmentId}, skipping.`
-            );
+            console.warn(`[STORE] Unknown assignmentId ${result.assignmentId} from Groq, skipping.`);
           }
           continue;
         }
-        reorderedAssignments.push({
-          ...assignment,
-          explanation: result.explanation,
-        });
+        reorderedAssignments.push({ ...assignment, explanation: result.explanation });
         assignmentsById.delete(result.assignmentId);
       }
 
-      // Preserve assignments not included in the priority response, keeping their original relative order.
-      const remainingAssignments = currentAssignments.filter((assignment) =>
-        assignmentsById.has(assignment.id)
-      );
-
+      const remainingAssignments = currentAssignments.filter((a) => assignmentsById.has(a.id));
       const updatedAssignments = [...reorderedAssignments, ...remainingAssignments];
 
       const priorityList = results.map((result, index) => ({
@@ -248,33 +219,20 @@ export const usePlannerStore = create<PlannerState & PlannerActions>((set, get) 
         explanation: result.explanation,
       }));
 
-      set({
-        assignments: updatedAssignments,
-        priorityList,
-        sortState: 'idle',
-        sortError: null,
-      });
-
+      set({ assignments: updatedAssignments, priorityList, sortState: 'idle', sortError: null });
       scheduleSave({ ...get() });
     } catch (err) {
       if (import.meta.env.DEV) {
-        console.error(`[STORE] Error during prioritization:`, err);
+        console.error('[STORE] Error during prioritization:', err);
       }
-      
+
       let errorMessage: string;
       if (err instanceof GroqServiceError) {
         switch (err.kind) {
-          case 'http':
-            errorMessage = err.message;
-            break;
-          case 'timeout':
-            errorMessage = 'Request timed out. Please try again.';
-            break;
-          case 'parse':
-            errorMessage = 'Could not parse the AI response. Please try again.';
-            break;
-          default:
-            errorMessage = err.message;
+          case 'http': errorMessage = err.message; break;
+          case 'timeout': errorMessage = 'Request timed out. Please try again.'; break;
+          case 'parse': errorMessage = 'Could not parse the AI response. Please try again.'; break;
+          default: errorMessage = err.message;
         }
       } else if (err instanceof Error) {
         errorMessage = err.message;
@@ -282,15 +240,7 @@ export const usePlannerStore = create<PlannerState & PlannerActions>((set, get) 
         errorMessage = 'An unexpected error occurred. Please try again.';
       }
 
-      if (import.meta.env.DEV) {
-        console.log(`[STORE] Prioritization failed: ${errorMessage}`);
-      }
-      set({
-        priorityList: [],
-        sortState: 'error',
-        sortError: errorMessage,
-      });
-
+      set({ priorityList: [], sortState: 'error', sortError: errorMessage });
       scheduleSave({ ...get() });
     }
   },
@@ -315,8 +265,7 @@ export function hydratePlannerStore(userId: string): void {
   } else if (rawExists) {
     usePlannerStore.setState({
       activeUserId: userId,
-      persistenceError:
-        'Some previously saved data could not be loaded and has been discarded.',
+      persistenceError: 'Some previously saved data could not be loaded and has been discarded.',
     });
   } else {
     usePlannerStore.setState({ activeUserId: userId });

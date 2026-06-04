@@ -544,3 +544,251 @@ main div[role='status'],
     max-width: none;
   }
 }
+
+/* =========================================================
+   ADDITIONS — difficulty sliders, chips, autocomplete, tags
+   ========================================================= */
+
+/* Field hints */
+.field-hint {
+  font-size: 0.82rem;
+  color: rgba(247, 242, 255, 0.55);
+  font-weight: 400;
+  margin-left: 0.3rem;
+}
+
+.field-error {
+  font-size: 0.88rem;
+  color: #fca5a5;
+  margin-top: 0.2rem;
+}
+
+/* Difficulty slider row */
+.difficulty-slider-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-top: 0.35rem;
+}
+
+.slider-label {
+  font-size: 0.78rem;
+  color: rgba(247, 242, 255, 0.55);
+  white-space: nowrap;
+}
+
+.difficulty-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #4ade80, #facc15, #f87171);
+  outline: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.difficulty-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(14, 8, 25, 0.35);
+  cursor: pointer;
+  transition: transform 120ms ease;
+}
+
+.difficulty-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.difficulty-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(14, 8, 25, 0.35);
+  cursor: pointer;
+  border: none;
+}
+
+/* Pips row — spans full 3 cols */
+.slider-pips {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 2px;
+}
+
+.pip {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  transition: background 200ms ease;
+}
+
+.pip-active {
+  background: rgba(255, 255, 255, 0.75);
+}
+
+/* Difficulty badge inline next to label */
+.difficulty-badge,
+.difficulty-inline-badge {
+  display: inline-block;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: rgba(247, 242, 255, 0.72);
+  margin-left: 0.45rem;
+}
+
+/* Course autocomplete dropdown */
+.course-suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 100;
+  list-style: none;
+  margin: 0;
+  padding: 0.35rem;
+  background: rgba(30, 18, 52, 0.98);
+  border: 1px solid rgba(156, 109, 255, 0.35);
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(14, 8, 25, 0.4);
+  backdrop-filter: blur(16px);
+  display: grid;
+  gap: 2px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.course-suggestion-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 0.85rem;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.course-suggestion-item:hover {
+  background: rgba(156, 109, 255, 0.2);
+}
+
+.suggestion-name {
+  font-size: 0.93rem;
+  color: #f7f2ff;
+  flex: 1;
+}
+
+.suggestion-difficulty {
+  font-size: 0.8rem;
+  color: rgba(247, 242, 255, 0.6);
+  white-space: nowrap;
+}
+
+.suggestion-difficulty-label {
+  font-size: 0.78rem;
+}
+
+/* Difficulty tag on class rows in dashboard */
+.difficulty-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--diff-color, #facc15);
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  letter-spacing: 0.04em;
+}
+
+.diff-label {
+  color: rgba(247, 242, 255, 0.65);
+  font-size: 0.75rem;
+}
+
+/* Assignment count chip on class rows */
+.class-assignment-count {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.78rem;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(247, 242, 255, 0.7);
+  margin-left: auto;
+}
+
+/* Assignment chips (weight + difficulty) */
+.assignment-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.2rem;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.chip-weight {
+  background: rgba(74, 222, 128, 0.15);
+  color: #86efac;
+  border: 1px solid rgba(74, 222, 128, 0.25);
+}
+
+.chip-difficulty {
+  background: rgba(250, 204, 21, 0.12);
+  color: #fde68a;
+  border: 1px solid rgba(250, 204, 21, 0.22);
+}
+
+/* AI explanation note on assignment rows */
+.assignment-ai-note {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.88rem;
+  color: rgba(167, 139, 250, 0.9);
+  font-style: italic;
+  line-height: 1.45;
+}
+
+/* Completed assignment row */
+.assignment-completed {
+  opacity: 0.55;
+}
+
+.assignment-completed strong {
+  text-decoration: line-through;
+}
+
+/* Two-column layout for weight + difficulty on assignment form */
+.assignment-meta-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 640px) {
+  .assignment-meta-row {
+    grid-template-columns: 1fr;
+  }
+}
