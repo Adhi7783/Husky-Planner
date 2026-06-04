@@ -110,6 +110,7 @@ Then restart the dev server.
 - Planner data is stored locally in the browser.
 - Google sign-in is optional and the app includes a local fallback path.
 - The deployed version is hosted on Vercel for easy access by users and reviewers.
+- During implementation we discovered UW Canvas API access limitations for student-developed applications. Because the project depended on institutional API permissions that were unavailable within the course timeline, we pivoted to a manual assignment-entry workflow while preserving the project's core goal: helping UW students prioritize academic work using AI.
 
 ## Security notes
 

@@ -1,26 +1,29 @@
 export interface Class {
-  id: string;           // UUID v4
-  name: string;         // trimmed, non-empty
-  createdAt: number;    // Date.now() at creation
+  id: string;
+  name: string;
+  createdAt: number;
+  difficulty: number; // 1–5 scale
 }
-
+ 
 export interface Assignment {
-  id: string;           // UUID v4
-  classId: string;      // foreign key → Class.id
-  name: string;         // trimmed, non-empty
-  dueDate: string;      // ISO 8601 date string (YYYY-MM-DD)
-  description?: string; // optional, stored as-is
-  explanation?: string; // optional AI reasoning attached after prioritization
+  id: string;
+  classId: string;
+  name: string;
+  dueDate: string;
+  description?: string;
+  explanation?: string;
   completed: boolean;
-  createdAt: number;    // Date.now() at creation
+  createdAt: number;
+  weight?: number;       // percentage 0–100
+  difficulty?: number;  // 1–5 override for this specific assignment
 }
-
+ 
 export interface PriorityItem {
   assignmentId: string;
   rank: number;
   explanation: string;
 }
-
+ 
 export interface PlannerState {
   classes: Class[];
   assignments: Assignment[];
@@ -31,22 +34,27 @@ export interface PlannerState {
   persistenceError: string | null;
   activeUserId: string;
 }
-
+ 
 export interface AssignmentPayload {
   id: string;
   name: string;
-  dueDate: string;       // ISO 8601 date string
+  dueDate: string;
   className: string;
   description?: string;
+  weight?: number;
+  difficulty?: number;
+  classDifficulty?: number;
 }
-
+ 
 export interface PriorityResult {
   assignmentId: string;
-  explanation: string;   // must reference at least one concrete factor
+  explanation: string;
 }
-
+ 
 export interface NewAssignment {
   name: string;
   dueDate: string;
   description?: string;
+  weight?: number;
+  difficulty?: number;
 }
