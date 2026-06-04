@@ -14,6 +14,9 @@ Students need a simple planner that reflects the pace of campus work and keeps a
 - Store planner data locally for fast, private use
 - Support optional Google sign-in while still working without OAuth
 
+## Dashboard 
+<img width="508" height="574" alt="Screenshot 2026-06-04 003021" src="https://github.com/user-attachments/assets/0b69f365-6760-4b87-84b5-0389318f0e2e" />
+
 ## Key features
 
 - Add and manage classes with custom names and sections
