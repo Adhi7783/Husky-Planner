@@ -51,7 +51,10 @@ This README functions as the project landing page with:
 - Optional Google Identity Services
 - Optional Groq AI sorting support
 
+
+
 ## Project architecture
+User -> React Frontend -> Zustand Store -> Groq API -> Priority Rankings
 
 The app follows a component-driven structure:
 
