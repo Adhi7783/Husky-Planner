@@ -3,21 +3,21 @@
 Planned milestones and what shipped.
 
 1. MVP — Class & Assignment management
-   - Planned: 2026-04-01
-   - Shipped: core CRUD and local persistence (localStorage)
+   - Planned: 2026-04-01 (target)
+   - Shipped: 2026-06-02 (commit 1767230 / tag v0.1) — core CRUD and local persistence (localStorage)
    - Notes: Basic UI implemented; tests for storage & validation added.
 
 2. Authentication (Google Sign-in)
-   - Planned: 2026-04-10
-   - Shipped: Google Sign-in implemented; requires OAuth origin registration for production preview URLs.
+   - Planned: 2026-04-10 (target)
+   - Shipped: 2026-06-02 (commit 6322a07 / tag v0.2) — Google Sign-in implemented; requires OAuth origin registration for preview/production URLs.
 
 3. AI Prioritization
-   - Planned: 2026-04-20
-   - Shipped: GROQ-based priority service, enriched prompt, and UI to show ranked items.
+   - Planned: 2026-04-20 (target)
+   - Shipped: 2026-06-03 (commit 991a79b / tag v0.3) — GROQ-based priority service, enriched prompt, and UI to show ranked items.
 
 4. CI + Docs
-   - Planned: 2026-05-01
-   - Shipped: GitHub Actions CI added; briefing & milestone docs added to repo.
+   - Planned: 2026-05-01 (target)
+   - Shipped: 2026-06-04 (commit 545746c) — GitHub Actions CI added; briefing & milestone docs added to repo.
 
 What didn't make it
 -------------------
