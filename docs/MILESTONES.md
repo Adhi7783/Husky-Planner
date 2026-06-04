@@ -31,20 +31,22 @@ Retrospective
 
 Planned vs Done (weekly snapshots)
 ---------------------------------
-The project tracked short weekly "Planned" vs "Done" boards while developing. Key recurring items across the snapshots:
+The project used short weekly "Planned" vs "Done" boards during development. Below are the consolidated items pulled from those snapshots.
 
-- Planned items seen in screenshots:
-   - UI fixes and visual improvements (layout, headings, spacing).
-   - AI sort assignments (improve prompt and prioritize flow).
-   - Google sign-in and authentication flows.
-   - Deploy to Vercel and make the project publicly available.
-   - Add a calendar view (future work).
+Planned (examples from snapshots)
+- Add feature to let users add assignments and course info (Canvas import was planned but later pivoted).
+- UI improvements: layout polish, headings, spacing, and clearer visuals for the dashboard.
+- AI-driven sorting: refine prompt, add clearer explanations, and support streaming tokens (future enhancement).
+- Google Sign-in / authentication flows (register OAuth origins for preview and production URLs).
+- Deploy the project to Vercel and keep deployment stable.
+- Add a calendar view and other visualizations (future work).
 
-- Done items seen in screenshots:
-   - Deployed on Vercel and cleaned up the repo.
-   - Implemented class and assignment creation UI.
-   - Added a course & assignment difficulty slider.
-   - Improved the AI prompt and explanations returned to users.
+Done (examples from snapshots)
+- Deployed on Vercel and cleaned up the repository.
+- Implemented class and assignment creation UI (users can add courses and assignments manually).
+- Added a course & assignment difficulty slider to capture effort signals.
+- Improved the AI prompt and explanation text returned to users; integrated GROQ-based service for prioritization.
+- Fixed build/test issues (TypeScript tests and Vite/Vitest typing) so CI/build can succeed.
 
 These snapshots were used as lightweight status boards during development to track visible progress for demos and project check-ins.
 
