@@ -4,20 +4,20 @@ Planned milestones and what shipped.
 
 1. MVP — Class & Assignment management
    - Planned: 2026-04-01 (target)
-   - Shipped: 2026-06-02 (commit 1767230 / tag v0.1) — core CRUD and local persistence (localStorage)
+   - Shipped: 2026-06-02 00:12:54 -0700 (commit 1767230524fa50ed71e57344ca132f19b40bf23d / tag v0.1) — core CRUD and local persistence (localStorage). Commit: https://github.com/Adhi7783/Husky-Planner/commit/1767230524fa50ed71e57344ca132f19b40bf23d
    - Notes: Basic UI implemented; tests for storage & validation added.
 
 2. Authentication (Google Sign-in)
    - Planned: 2026-04-10 (target)
-   - Shipped: 2026-06-02 (commit 6322a07 / tag v0.2) — Google Sign-in implemented; requires OAuth origin registration for preview/production URLs.
+   - Shipped: 2026-06-02 09:59:50 -0700 (commit 6322a0753f57c6e60dec1b3437e121bf384d508f / tag v0.2) — Google Sign-in implemented; requires OAuth origin registration for preview/production URLs. Commit: https://github.com/Adhi7783/Husky-Planner/commit/6322a0753f57c6e60dec1b3437e121bf384d508f
 
 3. AI Prioritization
    - Planned: 2026-04-20 (target)
-   - Shipped: 2026-06-03 (commit 991a79b / tag v0.3) — GROQ-based priority service, enriched prompt, and UI to show ranked items.
+   - Shipped: 2026-06-03 23:37:05 -0700 (commit 991a79bb7411ebaef6f7e65a845a7a93efe526fd / tag v0.3) — GROQ-based priority service, enriched prompt, and UI to show ranked items. Commit: https://github.com/Adhi7783/Husky-Planner/commit/991a79bb7411ebaef6f7e65a845a7a93efe526fd
 
 4. CI + Docs
    - Planned: 2026-05-01 (target)
-   - Shipped: 2026-06-04 (commit 545746c) — GitHub Actions CI added; briefing & milestone docs added to repo.
+   - Shipped: 2026-06-04 00:30:25 -0700 (commit 545746ca3077d29e0097359464bfba09868e539f) — GitHub Actions CI added; briefing & milestone docs added to repo. Commit: https://github.com/Adhi7783/Husky-Planner/commit/545746ca3077d29e0097359464bfba09868e539f
 
 What didn't make it
 -------------------
